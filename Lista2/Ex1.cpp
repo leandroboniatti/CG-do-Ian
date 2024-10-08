@@ -9,14 +9,19 @@
 #include <iostream>
 #include <string>
 #include <cmath>
-#include <assert.h> // COM .h é biblioteca do C - SEM o .h é biblioteca do C++
+#include <assert.h>
 
 #include <glad/glad.h> 	// biblioteca de funções baseada nas definições/especificações OPENGL
 						// Certifique-se de incluir a GLAD antes de outros arquivos de cabeçalho que requerem OpenGL (como GLFW)
 
 #include <GLFW/glfw3.h> // biblioteca de funções para criação da janela no Windows
 
-using namespace std;	// Para não precisar digitar std:: na frente de comandos como cout e cin					
+#include <glm/glm.hpp>	// biblioteca de operações matriciais
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+using namespace std;	// Para não precisar digitar std:: na frente de comandos da biblioteca
+using namespace glm;	// Para não precisar digitar glm:: na frente de comandos da biblioteca
 
 
 /*** Protótipos das funções ***/
@@ -30,16 +35,18 @@ int setupGeometry();	// Protótipo da função responsável pela criação do VB
 
 /*** Constantes	***/
 
-const GLuint WIDTH = 400, HEIGHT = 400;	// Dimensões da janela (pode ser alterado em tempo de execução)
+const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela (pode ser alterado em tempo de execução)
 
 const GLchar* vertexShaderSource = "#version 400\n"		// Código fonte do Vertex Shader (em GLSL - Graphics Library Shading Language)
 "layout (location = 0) in vec3 position;\n"	// "position" recebe as informações que estão no local 0 -> definidas no setupGeometry() -> glVertexAttribPointer(0, xxxxxxxx);
+"uniform mat4 projection;\n"				// "projection" receberá as informações da forma de projeção escolhida
+"uniform mat4 model;\n"						// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
 "void main()\n"
 "{\n"
 //...pode ter mais linhas de código para outros atributos, como cor, textura e normalização 
-"gl_Position = vec4(position.x, position.y, position.z, 1.0);\n"	// poderia ser: "gl_Position = vec4(position, 1.0);\n"	
-"}\0";																// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
-																	// é vec4 por causa das multiplicações de matrizes, usadas para translação, rotação e escala.
+"gl_Position = projection * model * vec4(position, 1.0);\n"	// era: vec4(position.x, position.y, position.z, 1.0);\n	
+"}\0";														// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
+		// sempre nessa ordem: projection * model * 		// é vec4 por causa das multiplicações de matrizes, usadas para translação, rotação e escala.
 
 const GLchar* fragmentShaderSource = "#version 400\n"	//Código fonte do Fragment Shader (em GLSL - Graphics Library Shading Language)
 "uniform vec4 inputColor;\n"
@@ -87,13 +94,31 @@ int main() {
 
 	GLuint shaderID = setupShader(); 	// Compilando e montando o programa de shader (retorna o identificador OpenGL para o programa de shader)
 	
-	GLuint VAOm = setupGeometry();		// Função para Gerar um buffer VAO simples com a geometria de um triângulo (retorna o identificador OpenGL para o VAO
-										// O identificador será armazenado em "VAOm" para não confundir com o VAO interno da função "setupGeometry()"
-	
+	GLuint VAO = setupGeometry();		// Função para Gerar um buffer VAO simples com a geometria de um triângulo (retorna o identificador OpenGL para o VAO
+		
 	// Neste código, para enviar a cor desejada para o fragment shader, utilizamos variável do tipo uniform (um vec4) já que a informação não estará nos buffers
 	glUseProgram(shaderID);
 	GLint colorLoc = glGetUniformLocation(shaderID, "inputColor");	// busca a localização da varíavel "inputColor" dentro do programa de shader
 																	// armazena esta localização em "colorLoc"
+
+	//Matriz de projeção paralela ortográfica
+	mat4 projection = ortho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);  	// ortho(Left, Right, Bottom, Top, Near, Far)
+	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
+
+	//Matriz de modelo: transformações na geometria (objeto)	// sempre na ordem Translação - Rotação - Escala
+	mat4 model = mat4(1); //salva em model a matriz identidade 4x4
+
+	//Translação
+	model = translate(model,vec3(400.0,300.0,0.0));
+	
+	//Rotação 
+	model = rotate(model,radians(90.0f),vec3(0.0,0.0,1.0));
+	
+	//Escala
+	model = scale(model,vec3(300.0,300.0,1.0));
+	
+	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+
 	
 	/*** Loop da aplicação - "game loop" ***/
 	while (!glfwWindowShouldClose(window))	{
@@ -107,7 +132,7 @@ int main() {
 		glLineWidth(10);	// o espessura padrão da linha é 1 pixel - alterado para....
 		glPointSize(20);	// o tamanho padrão do ponto é 1 pixel - alterado para....
 
-		glBindVertexArray(VAOm); // Conectando ao buffer de geometria
+		glBindVertexArray(VAO); // Conectando ao buffer de geometria
 
 		glUniform4f(colorLoc, 1.0f, 0.0f, 0.0f, 1.0f); //enviando cor do objeto para variável uniform chamada "inputColor" -> glUniform4f(%RED, %GREEN, %BLUE, %ALPHA);
 
@@ -116,23 +141,23 @@ int main() {
 
 		// Poligono (Triangulo) totalmente Preenchido
 		glDrawArrays(GL_TRIANGLES, 0, 3);	// Mudar de 3 pra 6 para fazer 2 triângulos ou
-		glDrawArrays(GL_TRIANGLES, 3, 3);
+		//glDrawArrays(GL_TRIANGLES, 3, 3);
 											
 		//Desenho com contorno (linhas)
-		glUniform4f(colorLoc, 0.0f, 0.0f, 1.0f, 1.0f); //enviando NOVA cor para variável uniform inputColor
-		glDrawArrays(GL_LINE_LOOP, 0, 3); //Desenha T0
-		glDrawArrays(GL_LINE_LOOP, 3, 3); //Desenha T1
+		//glUniform4f(colorLoc, 0.0f, 0.0f, 1.0f, 1.0f); //enviando NOVA cor para variável uniform inputColor
+		//glDrawArrays(GL_LINE_LOOP, 0, 3); //Desenha T0
+		//glDrawArrays(GL_LINE_LOOP, 3, 3); //Desenha T1
 
 		//Desenho só dos pontos (vértices)
-		glUniform4f(colorLoc, 1.0f, 1.0f, 0.0f, 1.0f); //enviando NOVA cor para variável uniform inputColor
-		glDrawArrays(GL_POINTS, 0, 6);
+		//glUniform4f(colorLoc, 1.0f, 1.0f, 0.0f, 1.0f); //enviando NOVA cor para variável uniform inputColor
+		//glDrawArrays(GL_POINTS, 0, 6);
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
 		
 		glfwSwapBuffers(window);	// Troca os buffers da tela
 	}
 	
-	glDeleteVertexArrays(1, &VAOm);	// Pede pra OpenGL desalocar os buffers
+	glDeleteVertexArrays(1, &VAO);	// Pede pra OpenGL desalocar os buffers
 	
 	glfwTerminate();	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
 
