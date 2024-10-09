@@ -133,7 +133,7 @@ int main() {
 		aplicaTransformacoes(shaderID, VAO, vec3(300.0,300.0,0.0), 180.0, vec3(210.0, 210.0,1.0), vec3(0.0,1.0,0.0));
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		// Desenha Segundo Poligno
+		// Desenha Terceiro Poligno
 		aplicaTransformacoes(shaderID, VAO, vec3(640.0,160.0,0.0), 270.0, vec3(300.0, 300.0,1.0), vec3(1.0,0.0,0.0));
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 

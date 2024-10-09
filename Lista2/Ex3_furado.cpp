@@ -10,6 +10,7 @@
 #include <string>
 #include <cmath>
 #include <assert.h>
+#include <vector>
 
 #include <glad/glad.h> 	// biblioteca de funções baseada nas definições/especificações OPENGL
 						// Certifique-se de incluir a GLAD antes de outros arquivos de cabeçalho que requerem OpenGL (como GLFW)
@@ -45,13 +46,12 @@ const GLchar* vertexShaderSource = "#version 400\n"		// Código fonte do Vertex 
 "uniform mat4 model;\n"						// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
 "void main()\n"
 "{\n"
-//...pode ter mais linhas de código para outros atributos, como cor, textura e normalização 
 "gl_Position = projection * model * vec4(position, 1.0);\n"	// era: vec4(position.x, position.y, position.z, 1.0);\n	
 "}\0";														// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
 		// sempre nessa ordem: projection * model * 		// é vec4 por causa das multiplicações de matrizes, usadas para translação, rotação e escala.
 
 const GLchar* fragmentShaderSource = "#version 400\n"	//Código fonte do Fragment Shader (em GLSL - Graphics Library Shading Language)
-"uniform vec4 inputColor;\n"
+"in vec3 inputColor;\n"
 "out vec4 color;\n"
 "void main()\n"
 "{\n"
@@ -98,10 +98,7 @@ int main() {
 	
 	GLuint VAO = setupGeometry();		// Função para Gerar um buffer VAO simples com a geometria de um triângulo (retorna o identificador OpenGL para o VAO
 		
-	// Neste código, para enviar a cor desejada para o fragment shader, utilizamos variável do tipo uniform (um vec4) já que a informação não estará nos buffers
 	glUseProgram(shaderID);
-	//GLint colorLoc = glGetUniformLocation(shaderID, "inputColor");	// busca a localização da varíavel "inputColor" dentro do programa de shader
-																	// armazena esta localização em "colorLoc"
 
 	//Matriz de projeção paralela ortográfica
 	mat4 projection = ortho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);  	// ortho(Left, Right, Bottom, Top, Near, Far)
@@ -111,41 +108,94 @@ int main() {
 	mat4 model = mat4(1); //salva em model a matriz identidade 4x4
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
 
-	float ladoDoQuadrado = 100;
+	int qtddeDeLinhas = 6;
+	int qtddeDeColunas = 8;
 
-	int qtddeDeLinhas = ceil(HEIGHT/ladoDoQuadrado);
-	int qtddeDeColunas = ceil(WIDTH/ladoDoQuadrado);
+	float ladoDoQuadrado = 100.0;
+	float qtddeDeQuadrados = 48.0;
 
-	int qtddeDeQuadrados = qtddeDeLinhas*qtddeDeColunas;
-	
+	float Xi = 50.0; float Yi = 550.0;
 
-	float Xi = ladoDoQuadrado/2; float Yi = (HEIGHT - ladoDoQuadrado/2);
+	vec3 cores [] = {
+		//    r     g    b	  
+		vec3(0.1,  0.2, 0.3),
+		vec3(1.0,  0.0, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.4,  0.5, 0.0),
+		vec3(0.1,  0.2, 0.3),
 
-	vec3 cores [qtddeDeQuadrados] = {};
+		vec3(0.1,  0.2, 0.3),
+		vec3(1.0,  0.0, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.4,  0.5, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		
+		vec3(0.1,  0.2, 0.3),
+		vec3(1.0,  0.0, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.4,  0.5, 0.0),
+		vec3(0.1,  0.2, 0.3),
 
-	srand(time(NULL));	// "semente" para o rand()
+		vec3(0.1,  0.2, 0.3),
+		vec3(1.0,  0.0, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.4,  0.5, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		
+		vec3(0.1,  0.2, 0.3),
+		vec3(1.0,  0.0, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.4,  0.5, 0.0),
+		vec3(0.1,  0.2, 0.3),
 
-	for (int i = 0; i < (qtddeDeQuadrados); i++) {
-		vec3 valor;
-		for (int j = 0; j < 2; j++) {
-			valor[j] = ((float)rand())/RAND_MAX;
-			cout<<i<<" "<<valor[j]<<endl;
-		}
-		cores [i] = valor;
-	}
-
-
-	/*
-	vec3 cores [] = {	//   vec3( r , g , b )	  
-		vec3(0.1,  0.2, 0.3),vec3(1.0,  0.0, 0.0),vec3(0.2,  0.2, 0.3),vec3(0.5,  0.5, 0.5),vec3(0.1,  0.2, 0.3),vec3(0.1,  0.2, 0.3),vec3(0.4,  0.5, 0.0),vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),vec3(1.0,  0.0, 0.0),vec3(0.2,  0.2, 0.3),vec3(0.5,  0.5, 0.5),vec3(0.1,  0.2, 0.3),vec3(0.1,  0.2, 0.3),vec3(0.4,  0.5, 0.0),vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),vec3(1.0,  0.0, 0.0),vec3(0.2,  0.2, 0.3),vec3(0.5,  0.5, 0.5),vec3(0.1,  0.2, 0.3),vec3(0.1,  0.2, 0.3),vec3(0.4,  0.5, 0.0),vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),vec3(1.0,  0.0, 0.0),vec3(0.2,  0.2, 0.3),vec3(0.5,  0.5, 0.5),vec3(0.1,  0.2, 0.3),vec3(0.1,  0.2, 0.3),vec3(0.4,  0.5, 0.0),vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),vec3(1.0,  0.0, 0.0),vec3(0.2,  0.2, 0.3),vec3(0.5,  0.5, 0.5),vec3(0.1,  0.2, 0.3),vec3(0.1,  0.2, 0.3),vec3(0.4,  0.5, 0.0),vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),vec3(1.0,  0.0, 0.0),vec3(0.2,  0.2, 0.3),vec3(0.5,  0.5, 0.5),vec3(0.1,  0.2, 0.3),vec3(0.1,  0.2, 0.3),vec3(0.4,  0.5, 0.0),vec3(0.1,  0.2, 0.3)
+		vec3(0.1,  0.2, 0.3),
+		vec3(1.0,  0.0, 0.0),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.1,  0.2, 0.3),
+		vec3(0.4,  0.5, 0.0),
+		vec3(0.1,  0.2, 0.3)
 	};
-	*/
+
+	for (int linha = 0; linha < qtddeDeLinhas; linha++) {
+			for (int coluna = 0; coluna < qtddeDeColunas; coluna++) {
+			
+				vec3 cor = cores[linha*qtddeDeColunas+coluna];
+				cout << linha*qtddeDeColunas+coluna << " " << cor.r << " " << cor.g << " " << cor.b << endl;
+			
+				//aplicaTransformacoes(shaderID, VAO, vec3(Xi,Yi,0.0), 0.0, vec3(100.0,100.0,1.0), cores[linha*qtddeDeColunas+coluna]);
+				
+				
+
+				//glDrawArrays(GL_TRIANGLE_FAN, 3, 4);
+
+				Xi = Xi + ladoDoQuadrado;
+
+			}
+			Xi = 50;
+			Yi = Yi - ladoDoQuadrado;
+			cout << endl;
+	}
 	
+		Yi = 550.0;
+
+
 	/*** Loop da aplicação - "game loop" ***/
 	while (!glfwWindowShouldClose(window))	{
 		
@@ -157,22 +207,28 @@ int main() {
 
 		glBindVertexArray(VAO); // Conectando ao buffer de geometria
 
-		Xi = ladoDoQuadrado/2; Yi = (HEIGHT - ladoDoQuadrado/2);
+		float Xi = 50.0; float Yi = 550.0;
 
-		for (int linha = 0; linha < qtddeDeLinhas; linha++) {
-			for (int coluna = 0; coluna < qtddeDeColunas; coluna++) {
+		//for (int linha = 0; linha < qtddeDeLinhas; linha++) {
+		//	for (int coluna = 0; coluna < qtddeDeColunas; coluna++) {
+		//		vec3 cor = cores[linha*qtddeDeColunas+coluna];
 
-				vec3 cor = cores[linha*qtddeDeColunas+coluna];
+		aplicaTransformacoes(shaderID, VAO, vec3(100.0,500.0,0.0),   0.0, vec3(100.0, 100.0,1.0), vec3(0.0,0.0,1.0));
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+			//	aplicaTransformacoes(shaderID, VAO, vec3(Xi,Yi,0.0), 0.0, vec3(100.0,100.0,1.0), vec3(1.0,0.0,0.0));
 				
-				aplicaTransformacoes(shaderID, VAO, vec3(Xi,Yi,0.0), 0.0, vec3(ladoDoQuadrado,ladoDoQuadrado,1.0), cores[linha*qtddeDeColunas+coluna]);
-				glDrawArrays(GL_TRIANGLE_FAN, 3, 4);
 
-				Xi = Xi + ladoDoQuadrado;
+			//	glDrawArrays(GL_TRIANGLE_FAN, 3, 4);
 
-			}
-			Xi = ladoDoQuadrado/2;
-			Yi = Yi - ladoDoQuadrado;
-		}
+			//	Xi = Xi + ladoDoQuadrado;
+				//cout << Xi << endl;
+
+		//	}
+			//Xi = 50;
+			//Yi = Yi - ladoDoQuadrado;
+			//cout << Yi << endl;
+		//}
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
 		
