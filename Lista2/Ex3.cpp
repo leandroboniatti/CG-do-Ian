@@ -108,28 +108,27 @@ int main() {
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
 
 	//Matriz de modelo inicial
-	mat4 model = mat4(1); //salva em model a matriz identidade 4x4
-	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+	//mat4 model = mat4(1); //salva em model a matriz identidade 4x4
+	//glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+
 
 	float ladoDoQuadrado = 100;
 
-	int qtddeDeLinhas = ceil(HEIGHT/ladoDoQuadrado);
-	int qtddeDeColunas = ceil(WIDTH/ladoDoQuadrado);
+	int qtddeDeLinhas = 6;
+	int qtddeDeColunas = 8;
 
 	int qtddeDeQuadrados = qtddeDeLinhas*qtddeDeColunas;
-	
 
-	float Xi = ladoDoQuadrado/2; float Yi = (HEIGHT - ladoDoQuadrado/2);
+	float Xi; float Yi;
 
 	vec3 cores [qtddeDeQuadrados] = {};
 
 	srand(time(NULL));	// "semente" para o rand()
 
-	for (int i = 0; i < (qtddeDeQuadrados); i++) {
+	for (int i = 0; i < (qtddeDeQuadrados); i++) {	// geração aleatória de cores
 		vec3 valor;
 		for (int j = 0; j < 2; j++) {
 			valor[j] = ((float)rand())/RAND_MAX;
-			cout<<i<<" "<<valor[j]<<endl;
 		}
 		cores [i] = valor;
 	}
@@ -161,14 +160,11 @@ int main() {
 
 		for (int linha = 0; linha < qtddeDeLinhas; linha++) {
 			for (int coluna = 0; coluna < qtddeDeColunas; coluna++) {
-
-				vec3 cor = cores[linha*qtddeDeColunas+coluna];
-				
+	
 				aplicaTransformacoes(shaderID, VAO, vec3(Xi,Yi,0.0), 0.0, vec3(ladoDoQuadrado,ladoDoQuadrado,1.0), cores[linha*qtddeDeColunas+coluna]);
 				glDrawArrays(GL_TRIANGLE_FAN, 3, 4);
 
 				Xi = Xi + ladoDoQuadrado;
-
 			}
 			Xi = ladoDoQuadrado/2;
 			Yi = Yi - ladoDoQuadrado;

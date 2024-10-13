@@ -98,9 +98,7 @@ int main() {
 		
 	// Neste código, para enviar a cor desejada para o fragment shader, utilizamos variável do tipo uniform (um vec4) já que a informação não estará nos buffers
 	glUseProgram(shaderID);
-	GLint colorLoc = glGetUniformLocation(shaderID, "inputColor");	// busca a localização da varíavel "inputColor" dentro do programa de shader
-																	// armazena esta localização em "colorLoc"
-
+	
 	//Matriz de projeção paralela ortográfica
 	mat4 projection = ortho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);  	// ortho(Left, Right, Bottom, Top, Near, Far)
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
@@ -134,7 +132,7 @@ int main() {
 
 		glBindVertexArray(VAO); // Conectando ao buffer de geometria
 
-		glUniform4f(colorLoc, 1.0f, 0.0f, 0.0f, 1.0f); //enviando cor do objeto para variável uniform chamada "inputColor" -> glUniform4f(%RED, %GREEN, %BLUE, %ALPHA);
+		glUniform4f(glGetUniformLocation(shaderID, "inputColor"), 1.0f, 0.0f, 0.0f, 1.0f); //enviando cor do objeto para variável uniform chamada "inputColor" -> glUniform4f(%RED, %GREEN, %BLUE, %ALPHA);
 
 
 		/*** chamadas de desenho = drawcalls ***/

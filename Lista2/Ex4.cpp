@@ -10,7 +10,6 @@
 #include <string>
 #include <cmath>
 #include <assert.h>
-#include <vector>
 
 #include <glad/glad.h> 	// biblioteca de funções baseada nas definições/especificações OPENGL
 						// Certifique-se de incluir a GLAD antes de outros arquivos de cabeçalho que requerem OpenGL (como GLFW)
@@ -25,13 +24,16 @@ using namespace std;	// Para não precisar digitar std:: na frente de comandos d
 using namespace glm;	// Para não precisar digitar glm:: na frente de comandos da biblioteca
 
 
+enum directions {NONE, UP, DOWN, LEFT, RIGHT};
+
+
 /*** Protótipos das funções ***/
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode); // Protótipo da função de callback de teclado
 
-int setupShader();		// Protótipo da função responsável pela compilação e montagem do programa de shader
+int setupShader();		// Protótipo da função responsápasso pela compilação e montagem do programa de shader
 
-int setupGeometry();	// Protótipo da função responsável pela criação do VBO e do VAO
+int setupGeometry();	// Protótipo da função responsápasso pela criação do VBO e do VAO
 
 void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float anguloDeRotacao, vec3 escala, vec3 color, vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0)));
 
@@ -46,17 +48,23 @@ const GLchar* vertexShaderSource = "#version 400\n"		// Código fonte do Vertex 
 "uniform mat4 model;\n"						// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
 "void main()\n"
 "{\n"
+//...pode ter mais linhas de código para outros atributos, como cor, textura e normalização 
 "gl_Position = projection * model * vec4(position, 1.0);\n"	// era: vec4(position.x, position.y, position.z, 1.0);\n	
-"}\0";														// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
+"}\0";														// "gl_Position" é uma variápasso específica do GLSL que recebe a posição final do vertice processado
 		// sempre nessa ordem: projection * model * 		// é vec4 por causa das multiplicações de matrizes, usadas para translação, rotação e escala.
 
 const GLchar* fragmentShaderSource = "#version 400\n"	//Código fonte do Fragment Shader (em GLSL - Graphics Library Shading Language)
-"in vec3 inputColor;\n"
+"uniform vec4 inputColor;\n"
 "out vec4 color;\n"
 "void main()\n"
 "{\n"
 "color = inputColor;\n"
 "}\0";
+
+
+/*** Variáveis Globais	***/
+
+int dir = NONE;
 
 
 /*** Função MAIN ***/
@@ -98,104 +106,25 @@ int main() {
 	
 	GLuint VAO = setupGeometry();		// Função para Gerar um buffer VAO simples com a geometria de um triângulo (retorna o identificador OpenGL para o VAO
 		
+	// Neste código, para enviar a cor desejada para o fragment shader, utilizamos variápasso do tipo uniform (um vec4) já que a informação não estará nos buffers
 	glUseProgram(shaderID);
+	//GLint colorLoc = glGetUniformLocation(shaderID, "inputColor");	// busca a localização da varíapasso "inputColor" dentro do programa de shader
+																	// armazena esta localização em "colorLoc"
 
 	//Matriz de projeção paralela ortográfica
 	mat4 projection = ortho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);  	// ortho(Left, Right, Bottom, Top, Near, Far)
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
 
 	//Matriz de modelo inicial
-	mat4 model = mat4(1); //salva em model a matriz identidade 4x4
-	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+	//mat4 model = mat4(1); //salva em model a matriz identidade 4x4
+	//glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
 
-	int qtddeDeLinhas = 6;
-	int qtddeDeColunas = 8;
 
-	float ladoDoQuadrado = 100.0;
-	float qtddeDeQuadrados = 48.0;
+	vec3 posicaoNaTela = vec3(400,300,0);
 
-	float Xi = 50.0; float Yi = 550.0;
+	float passo = 0.1;
 
-	vec3 cores [] = {
-		//    r     g    b	  
-		vec3(0.1,  0.2, 0.3),
-		vec3(1.0,  0.0, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.4,  0.5, 0.0),
-		vec3(0.1,  0.2, 0.3),
-
-		vec3(0.1,  0.2, 0.3),
-		vec3(1.0,  0.0, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.4,  0.5, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		
-		vec3(0.1,  0.2, 0.3),
-		vec3(1.0,  0.0, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.4,  0.5, 0.0),
-		vec3(0.1,  0.2, 0.3),
-
-		vec3(0.1,  0.2, 0.3),
-		vec3(1.0,  0.0, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.4,  0.5, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		
-		vec3(0.1,  0.2, 0.3),
-		vec3(1.0,  0.0, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.4,  0.5, 0.0),
-		vec3(0.1,  0.2, 0.3),
-
-		vec3(0.1,  0.2, 0.3),
-		vec3(1.0,  0.0, 0.0),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.1,  0.2, 0.3),
-		vec3(0.4,  0.5, 0.0),
-		vec3(0.1,  0.2, 0.3)
-	};
-
-	for (int linha = 0; linha < qtddeDeLinhas; linha++) {
-			for (int coluna = 0; coluna < qtddeDeColunas; coluna++) {
-			
-				vec3 cor = cores[linha*qtddeDeColunas+coluna];
-				cout << linha*qtddeDeColunas+coluna << " " << cor.r << " " << cor.g << " " << cor.b << endl;
-			
-				//aplicaTransformacoes(shaderID, VAO, vec3(Xi,Yi,0.0), 0.0, vec3(100.0,100.0,1.0), cores[linha*qtddeDeColunas+coluna]);
-				
-				
-
-				//glDrawArrays(GL_TRIANGLE_FAN, 3, 4);
-
-				Xi = Xi + ladoDoQuadrado;
-
-			}
-			Xi = 50;
-			Yi = Yi - ladoDoQuadrado;
-			cout << endl;
-	}
 	
-		Yi = 550.0;
-
-
 	/*** Loop da aplicação - "game loop" ***/
 	while (!glfwWindowShouldClose(window))	{
 		
@@ -207,28 +136,17 @@ int main() {
 
 		glBindVertexArray(VAO); // Conectando ao buffer de geometria
 
-		float Xi = 50.0; float Yi = 550.0;
+		switch (dir) {
+			case UP:	posicaoNaTela.y += passo;	break;
+			case DOWN: 	posicaoNaTela.y -= passo;	break;
+			case LEFT: 	posicaoNaTela.x -= passo;	break;
+			case RIGHT: posicaoNaTela.x += passo;	break;
+			default:								break;
+		} 
 
-		//for (int linha = 0; linha < qtddeDeLinhas; linha++) {
-		//	for (int coluna = 0; coluna < qtddeDeColunas; coluna++) {
-		//		vec3 cor = cores[linha*qtddeDeColunas+coluna];
-
-		aplicaTransformacoes(shaderID, VAO, vec3(100.0,500.0,0.0),   0.0, vec3(100.0, 100.0,1.0), vec3(0.0,0.0,1.0));
+		aplicaTransformacoes(shaderID, VAO, posicaoNaTela, 0.0, vec3(100,100,1), vec3(1.0,0.0,0.0));
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-			//	aplicaTransformacoes(shaderID, VAO, vec3(Xi,Yi,0.0), 0.0, vec3(100.0,100.0,1.0), vec3(1.0,0.0,0.0));
-				
-
-			//	glDrawArrays(GL_TRIANGLE_FAN, 3, 4);
-
-			//	Xi = Xi + ladoDoQuadrado;
-				//cout << Xi << endl;
-
-		//	}
-			//Xi = 50;
-			//Yi = Yi - ladoDoQuadrado;
-			//cout << Yi << endl;
-		//}
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
 		
@@ -246,12 +164,19 @@ int main() {
 // Função de callback de teclado - só pode ter uma instância (deve ser estática se estiver dentro de uma classe)
 // É chamada sempre que uma tecla for pressionada ou solta via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-		glfwSetWindowShouldClose(window, GL_TRUE);
+
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {glfwSetWindowShouldClose(window, GL_TRUE);}
+	
+	if 		(key == GLFW_KEY_W || key == GLFW_KEY_UP   ) {dir = UP;   }		// || = OR
+	else if (key == GLFW_KEY_S || key == GLFW_KEY_DOWN ) {dir = DOWN; }
+	else if (key == GLFW_KEY_A || key == GLFW_KEY_LEFT ) {dir = LEFT; }
+	else if (key == GLFW_KEY_D || key == GLFW_KEY_RIGHT) {dir = RIGHT;}
+	
+	if (action == GLFW_RELEASE)	{ dir = NONE; }	
 }
 
 
-// Função responsável pela compilação e montagem do programa de shader
+// Função responsápasso pela compilação e montagem do programa de shader
 // Por enquanto, neste código, um único e simples programa de shader
 // Os códigos fonte do vertex shader e do fragment shader estão nos arrays vertexShaderSource e fragmentShaderSource no iniçio deste arquivo
 // A função retorna o identificador do programa de shader (em "main" teremos shaderID = setupShader(), que equivale a shaderID = shaderProgram)
@@ -304,10 +229,10 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 }
 
 
-// Função responsável pela criação do VBO e do VAO - por enquanto, somente um de cada
+// Função responsápasso pela criação do VBO e do VAO - por enquanto, somente um de cada
 // O objetivo é criar os buffers que armazenam a geometria de um triângulo: VBO e VAO
 // Por enquanto, enviando apenas atributo de coordenadas dos vértices
-// Por enquanto, o atributo de cor é enviado externamente por uma variável tipo "uniform" chamada "inputColor"
+// Por enquanto, o atributo de cor é enviado externamente por uma variápasso tipo "uniform" chamada "inputColor"
 // Por enquanto, 1 VBO com as coordenadas, VAO com apenas 1 ponteiro para atributo
 // A função retorna o identificador do VAO (em "main" teremos VAOm = setupShader(), que equivale a VAOm = VAO)
 int setupGeometry() {
@@ -365,6 +290,7 @@ int setupGeometry() {
 }
 
 
+// Função responsápasso pela aplicação das transformações de Translação, Rotação e Escala
 void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float anguloDeRotacao, vec3 escala, vec3 color, vec3 eixoDeRotacao) {
 	
 	/*** Transformações na geometria (objeto) -> sempre na ordem Translação - Rotação - Escala ***/
@@ -386,5 +312,4 @@ void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float
 
 	// Cores sendo enviadas para "inputColor"
 	glUniform4f(glGetUniformLocation(shaderID, "inputColor"), color.r, color.g, color.b , 1.0f);
-	
 }
