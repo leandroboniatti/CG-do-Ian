@@ -20,7 +20,4 @@ Entrega da Lista 2 de Fundamentos de Computação Gráfica
 
   
 4.
-
-
-Sintaxe básica de gravação e formatação no GitHub:
-https://docs.github.com/pt/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax
+Código fonte em https://github.com/IanBoniatti/ProjetosFundamentosCG/blob/main/Lista2/Ex4.cpp
