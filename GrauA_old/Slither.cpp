@@ -12,7 +12,7 @@
 
 #include <glad/glad.h> 	// biblioteca de funções baseada nas definições/especificações OPENGL - Incluir antes de outros que requerem OpenGL (como GLFW)
 
-#include <GLFW/glfw3.h> // biblioteca de funções para criação da janela no Windows e gerenciar entrada de teclado/mouse
+#include <GLFW/glfw3.h> // biblioteca de funções para criação da janela no Windows
 
 #include <glm/glm.hpp>	// biblioteca de operações matriciais
 #include <glm/gtc/matrix_transform.hpp>
@@ -22,67 +22,66 @@ using namespace std;	// Para não precisar digitar std:: na frente de comandos d
 using namespace glm;	// Para não precisar digitar glm:: na frente de comandos da biblioteca
 
 
-// ENUM para definir sentido dado pela entrada de teclado
-enum Directions {NONE, UP, DOWN, LEFT, RIGHT};
+/*** ENUMs e STRUCTs ***/
+enum directions {NONE, UP, DOWN, LEFT, RIGHT};
 
-
-// Estrutura para armazenar informações sobre um determinado elemento da cena
-struct Sprites { 
-	GLuint VAO;		// Vertex Array Geometry do elemento da cena
-	vec3 posAtual;	// Posição atual do elemento
-	vec3 dimensao;	// Escala aplicada ao elemento (largura, altura)
-    float angulo;   // Ângulo de rotação aplicado ao elemento	// em radianos
-	vec3 cor;       // Cor do elemento	
-//    int nVertices;  // Número de vértices a desenhar para este elemento
+struct slitherSegments {
+	GLuint VAO;
+	vec3 posição;
+	vec3 cor;
+	vec3 escala;
 };
 
 
 /*** Protótipos das funções ***/
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode); // Função de callback de teclado
-int  setupShader();		// Função responsável pela compilação e montagem do programa de shader
-int  createTriangle();	// Função responsável pela criação do VBO e do VAO de um TRIÂNGULO normalizados
-int  createCircle(int verticesExternos, float raio = 0.5); // Função responsável pela criação do VBO e do VAO de um CÍRCULO
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode); // Protótipo da função de callback de teclado
+
+int setupShader();		// Protótipo da função responsável pela compilação e montagem do programa de shader
+
+int setupGeometry();	// Protótipo da função responsável pela criação do VBO e do VAO
+
+int createCircle(int verticesExternos, float raio = 0.5);
+
 void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float anguloDeRotacao, vec3 escala, vec3 color, vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0)));
 
 
 /*** Constantes	***/
-const float Pi = 3.14159;
-const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela
-const vec2 slitherDim = vec2(40,40);
-const float distElementos = 10.0f;
-const float passoKbca = 0.01f;	// "velocidade" de incremento na posição da cabeça
-const float passoSegm = 0.01f;	// "velocidade" de incremento na posição dos elementos seguintes
-const bool controleTeclado = false;	// false -> controle pelo mouse
+const float Pi = 3.14159265;
+
+const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela (pode ser alterado em tempo de execução)
 
 
 /*** Variáveis Globais	***/
-bool keys [1024];
-//vec2 mousePos;     // Posição do cursor do mouse
-//vec3 dir2Kbca  = vec3(0.0, -1.0, 0.0); // Vetor direção do segmento para a Kbca
-//vec3 dir2Mouse = vec3(0.0, -1.0, 0.0); // Vetor direção da Kbca para o mouse
+bool keys [1024];	// array para receber estado das teclas -> pressionadas/soltas 
+
 
 
 /*** Função MAIN ***/
 int main() {
 
 	// Variáveis Locais do main
-	int verticesExternos = 32;	// Parâmetro para o Círculo
-	float anguloInicial = 0;	//
-	//float passo = 0.05;			
+	int verticesExternos =   32;
+	float anguloInicial  =    0;
 	vec3 posicaoNaTela = vec3(400,300,0);
+	float passo = 0.05;
 
-
-	// GLFW: Inicialização e configurações de versão do OpenGL
+	// GLFW
 	glfwInit();	// Inicialização da GLFW
+
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);		// Informa a versão do OpenGL a partir da qual o código funcionará			
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);		// Exemplo para versão 4.6 - Você deve adaptar para a versão do OpenGL suportada por sua placa
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
+	//Sugestão: comente as 3 linhas de código anteriores para descobrir a versão suportada por sua placa e depois atualize (por exemplo: 4.5 com 4 e 5)
 	//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); //Essencial para computadores da Apple
+		
 	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "SLITHER.IO - Ian R. Boniatti e Eduardo Tropea", nullptr, nullptr);	// Criação da janela GLFW
-	glfwMakeContextCurrent(window);
-	glfwSetKeyCallback(window, key_callback);	// Registro da função de callback para a janela GLFW
 	
+	glfwMakeContextCurrent(window);
 
+	glfwSetKeyCallback(window, key_callback);	// Fazendo o registro da função de callback para a janela GLFW
+	
+	
 	// GLAD: carrega todos os ponteiros de funções da OpenGL
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) { cout << "Failed to initialize GLAD" << std::endl; }
 
@@ -104,78 +103,54 @@ int main() {
 	GLuint shaderID = setupShader(); // Retorna o identificador OpenGL para o programa de shader
 	
 
-	// Criação dos elementos 
-	Sprites kbca;	// Gera o elemento "cabeça"
-	kbca.VAO = createTriangle(); //createCircle(32);
-	kbca.posAtual = vec3(400,300,0);
+	slitherSegments kbca;
+	kbca.VAO = createCircle(32);
+	kbca.posição = vec3(0,0,0);
 	kbca.cor = vec3(1,0,0);
-	kbca.dimensao = vec3(slitherDim,0);
+	kbca.escala = vec3(50,50,0);
 
-	Sprites segmento;
-	segmento.VAO = createTriangle(); //createCircle(32);
-	segmento.posAtual = vec3(410,310,0);
-	segmento.cor = vec3(1,1,0);
-	segmento.dimensao = vec3(slitherDim,0);
-
-
-	// Ativa o teste de profundidade
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_ALWAYS); // Sempre passará no teste de profundidade (desnecessário se não houver profundidade)
-	
-
+	//GLuint VAO = createCircle(verticesExternos);	// Retorna o identificador OpenGL para o VAO
+		
+	// Neste código, para enviar a cor desejada para o fragment shader, utilizamos variável do tipo uniform (um vec4) já que a informação não estará nos buffers
 	glUseProgram(shaderID);
-	
+	//GLint colorLoc = glGetUniformLocation(shaderID, "inputColor");	// busca a localização da varíavel "inputColor" dentro do programa de shader
+																		// armazena esta localização em "colorLoc"
 
-	// Aplica a Matriz de projeção paralela ortográfica (usada para desenhar em 2D)
+	//Matriz de projeção paralela ortográfica
 	mat4 projection = ortho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);  	// ortho(Left, Right, Bottom, Top, Near, Far)
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
+
+	//Matriz de modelo inicial
+	//mat4 model = mat4(1); //salva em model a matriz identidade 4x4
+	//glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+
+
+
 
 	
 	/*** Loop da aplicação - "game loop" ***/
 	while (!glfwWindowShouldClose(window))	{
 		
-		glfwPollEvents(); // Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
+		glfwPollEvents();	// Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 
-		// Limpa o buffer de cor	// Limpa a tela
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // define a cor de fundo (%RED, %GREEN, %BLUE, %ALPHA);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		// Limpa o buffer de cor
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // define a cor de fundo - % normalizado, definido de 0.0 a 1.0 -> glClearColor(%RED, %GREEN, %BLUE, %ALPHA);
+		glClear(GL_COLOR_BUFFER_BIT);
 
-		if (controleTeclado) {
-			if (keys[GLFW_KEY_UP   ] || keys[GLFW_KEY_W]) { kbca.posAtual.y += passoKbca; kbca.angulo = radians(  0.0f); }
-			if (keys[GLFW_KEY_DOWN ] || keys[GLFW_KEY_S]) { kbca.posAtual.y -= passoKbca; kbca.angulo = radians(180.0f); }
-			if (keys[GLFW_KEY_LEFT ] || keys[GLFW_KEY_A]) { kbca.posAtual.x -= passoKbca; kbca.angulo = radians( 90.0f); }
-			if (keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D]) { kbca.posAtual.x += passoKbca; kbca.angulo = radians(270.0f); }
-		}
-		else {
-	    	// Pega a posição do mouse e calcula a direção
-    	    double xPos, yPos;
-        	glfwGetCursorPos(window, &xPos, &yPos);
-        	vec2 mousePos = vec2(xPos, height - yPos);  // Inverte o eixo Y para se alinhar à tela
-    
-	    	vec3 dir2Mouse = normalize(vec3(mousePos, 0.0) - kbca.posAtual);
-        	float angulo2Mouse = atan2(dir2Mouse.y, dir2Mouse.x);
+		glBindVertexArray(kbca.VAO); // Conectando ao buffer de geometria
 
-    		// Move o elemento suavemente na direção do mouse ou na direção dada pelas teclas
-        	if (distance(kbca.posAtual, vec3(mousePos, 0.0)) > 0.01f) { kbca.posAtual += passoKbca * dir2Mouse; } // Aumente ou diminua passoKbca para controlar a velocidade
+		if(keys[GLFW_KEY_UP   ] || keys[GLFW_KEY_W]) { posicaoNaTela.y += passo; }
+		if(keys[GLFW_KEY_DOWN ] || keys[GLFW_KEY_S]) { posicaoNaTela.y -= passo; }
+		if(keys[GLFW_KEY_LEFT ] || keys[GLFW_KEY_A]) { posicaoNaTela.x -= passo; }
+		if(keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D]) { posicaoNaTela.x += passo; }
 
-       		// Atualiza o ângulo de rotação da kbca
-        	kbca.angulo = angulo2Mouse + radians(-90.0f); // Rotaciona para que aponte para o mouse
-		}
+		//glfwGetCursorPos(window, &cursorPosX, &cursorPosY);
 
-		vec3 dir2Kbca = normalize(kbca.posAtual - segmento.posAtual);
-        float angle2Kbca = atan2(dir2Kbca.y, dir2Kbca.x);
+		kbca.posição = posicaoNaTela;
 
-		if (distance(segmento.posAtual, kbca.posAtual) > distElementos) { segmento.posAtual += passoSegm * dir2Kbca; }  // Aumente ou diminua 0.5f para controlar a velocidade
-        
-        // Atualiza o ângulo de rotação do segmento
-        segmento.angulo = angle2Kbca + radians(-90.0f); // Rotaciona para que a ponta aponte para o mouse
+		aplicaTransformacoes(shaderID, kbca.VAO, kbca.posição, 0.0, kbca.escala, kbca.cor);
+		glDrawArrays(GL_TRIANGLE_FAN, 0, verticesExternos + 2);
 
-		aplicaTransformacoes(shaderID, segmento.VAO, segmento.posAtual, segmento.angulo, segmento.dimensao, segmento.cor);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		//glBindVertexArray(0);	//Desconectando o buffer de geometria
-
-    	aplicaTransformacoes(shaderID, kbca.VAO, kbca.posAtual, kbca.angulo, kbca.dimensao, kbca.cor);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
 		
@@ -207,7 +182,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 // Os códigos fonte do vertex shader e do fragment shader estão nos arrays vertexShaderSource e fragmentShaderSource no iniçio deste arquivo
 // A função retorna o identificador do programa de shader (em "main" teremos shaderID = setupShader(), que equivale a shaderID = shaderProgram)
 int setupShader() {	/*** Função para gerar o programa de shader ***/
-
+	
 	// Código fonte do Vertex Shader (em GLSL - Graphics Library Shading Language)
 	const GLchar* vertexShaderSource = R"(
 		#version 400							
@@ -274,17 +249,17 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 
 	glDeleteShader(fragmentShader);
 
-	return shaderProgram;	// retorna o identificador para o programa de shader
+	return shaderProgram;
 }
 
 
-// Função responsável pela criação do VBO e do VAO dos Triângulos
+// Função responsável pela criação do VBO e do VAO - por enquanto, somente um de cada
 // O objetivo é criar os buffers que armazenam a geometria de um triângulo: VBO e VAO
 // Por enquanto, enviando apenas atributo de coordenadas dos vértices
 // Por enquanto, o atributo de cor é enviado externamente por uma variável tipo "uniform" chamada "inputColor"
 // Por enquanto, 1 VBO com as coordenadas, VAO com apenas 1 ponteiro para atributo
 // A função retorna o identificador do VAO (em "main" teremos VAOm = setupShader(), que equivale a VAOm = VAO)
-int createTriangle() {
+int setupGeometry() {
 
 	// Aqui setamos as coordenadas x, y e z do triângulo e as armazenamos de forma sequencial, já visando mandar para o VBO (Vertex Buffer Objects)
 	// Cada atributo do vértice (coordenada, cores, coordenadas de textura, normal, etc) pode ser arazenado em um VBO único ou em VBOs separados
@@ -336,7 +311,6 @@ int createTriangle() {
 }
 
 
-// Função responsável pela criação do VBO e do VAO dos Circulos 
 int createCircle(int verticesExternos, float raio) {
 	
 	vector <GLfloat> vertices;
@@ -349,7 +323,7 @@ int createCircle(int verticesExternos, float raio) {
 	vertices.push_back(0.0);	// Yc
 	vertices.push_back(0.0);	// Zc
 
-	for (int i = 1; i <= verticesExternos+1; i++)	{		
+	for (int i = 1; i <= verticesExternos; i++)	{		
 		
 		vertices.push_back(raio * cos(anguloAtual));	// Xi
 		vertices.push_back(raio * sin(anguloAtual)); 	// Yi
@@ -358,8 +332,8 @@ int createCircle(int verticesExternos, float raio) {
 		anguloAtual = anguloAtual + intervalo;
 	}
 
-	
-	// Configuração dos buffers VBO e VAO
+	/*** Configuração dos buffers VBO e VAO ***/
+
 	GLuint VBO, VAO;
 	
 	glGenBuffers(1, &VBO);	// Geração do identificador do VBO (Vertex Buffer Objects)
@@ -397,11 +371,16 @@ void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float
 	
 	/*** Transformações na geometria (objeto) -> sempre na ordem Translação - Rotação - Escala ***/
 
-	glBindVertexArray(VAO); // Vincula o VAO
-	
-	mat4 model = mat4(1); // salva em model a matriz identidade 4x4 (Matriz de modelo inicial)
+	//Matriz de modelo inicial
+	mat4 model = mat4(1); //salva em model a matriz identidade 4x4
+
+	//Translação
 	model = translate(model,posicaoNaTela);
-	model = rotate(model,anguloDeRotacao,eixoDeRotacao);
+
+	//Rotação 
+	model = rotate(model,radians(anguloDeRotacao),eixoDeRotacao);
+
+	//Escala
 	model = scale(model,escala);
 	
 	// Transformações sendo enviadas para "model"
