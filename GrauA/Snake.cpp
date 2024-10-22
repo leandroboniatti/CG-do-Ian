@@ -42,7 +42,7 @@ void key_callback (GLFWwindow* window, int key, int scancode, int action, int mo
 int  setupShader ();		// Função responsável pela compilação e montagem do programa de shader
 int  createTriangle ();	// Função responsável pela criação do VBO e do VAO de um TRIÂNGULO
 int  createCircle (int verticesExternos, float raio = 0.5); // Função responsável pela criação do VBO e do VAO de um CÍRCULO
-Geometry createSegment (int i, vec3 dir);	// Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
+Geometry createSegment (int i);	// Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 
 // Função responsápasso pela aplicação das transformações de Translação, Rotação e Escala
 void aplicaTransformacoes(	GLuint shaderID,			// 1º parâmetro: identificador do programa de shader
@@ -67,8 +67,8 @@ const float minSegDistance = 10.0f, maxSegDistance = 20.0f;
 /*** Variáveis Globais	***/
 bool keys [1024];
 
-vector <Geometry> cobrinha;	// Vetor que armazena todos os segmentos da cobrinha, incluindo a cabeça
-vector <Geometry> olhos;	// Vetor que armazena os elementos dos olhos da cobrinha
+vector <Geometry> snake;	// Vetor que armazena todos os segmentos da cobrinha, incluindo a cabeça
+vector <Geometry> Eyes;	// Vetor que armazena os elementos dos olhos da cobrinha
 
 //vec2 mousePos;     // Posição do cursor do mouse
 //vec3 dir2Kbca  = vec3(0.0, -1.0, 0.0); // Vetor direção do segmento para a Kbca
@@ -120,7 +120,13 @@ int main() {
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
 
 
-	// Criação dos elementos 
+	// Criação dos elementos
+	snake.push_back(createSegment(0));
+	snake.push_back(createSegment(1));
+
+
+
+/*
 	Geometry kbca;	// Gera o elemento "cabeça"
 	kbca.VAO = createTriangle(); //createCircle(32);
 	kbca.posAtual = vec3(400,300,0);
@@ -132,7 +138,7 @@ int main() {
 	segmento.posAtual = vec3(410,310,0);
 	segmento.cor = vec3(1,1,0);
 	segmento.dimensao = vec3(segmentDim,0);
-
+*/
 
 	
 	/*** Loop da aplicação - "game loop" ***/
@@ -157,29 +163,29 @@ int main() {
         	glfwGetCursorPos(window, &xPos, &yPos);		// Obtem a posição do mouse
         	vec2 mousePos = vec2(xPos, height - yPos);  // Inverte o eixo Y para se alinhar à tela
     
-	    	vec3 dir2Mouse = normalize(vec3(mousePos, 0.0) - kbca.posAtual);	// Calcula o vetor direção normalizado
+	    	vec3 dir2Mouse = normalize(vec3(mousePos, 0.0) - snake[0].posAtual);	// Calcula o vetor direção normalizado
         	float angle2Mouse = atan2(dir2Mouse.y, dir2Mouse.x);	// calcula o ângulo do vetor "dir2Mouse"
 
     		// Move o elemento suavemente na direção do mouse ou na direção dada pelas teclas
-        	if (distance(kbca.posAtual, vec3(mousePos, 0.0)) > 0.01f) { kbca.posAtual += passoKbca * dir2Mouse; } // Aumentar ou diminuir "passoKbca" para controlar a velocidade
+        	if (distance(snake[0].posAtual, vec3(mousePos, 0.0)) > 0.01f) { snake[0].posAtual += passoKbca * dir2Mouse; } // Aumentar ou diminuir "passoKbca" para controlar a velocidade
 
        		// Atualiza o ângulo de rotação do elemento
-        	kbca.angulo = angle2Mouse + radians(-90.0f); // Rotaciona para que aponte para o mouse
+        	snake[0].angulo = angle2Mouse + radians(-90.0f); // Rotaciona para que aponte para o mouse
 		}
 
-		vec3 dir2Kbca = normalize(kbca.posAtual - segmento.posAtual);
+		vec3 dir2Kbca = normalize(snake[0].posAtual - snake[1].posAtual);
         float angle2Kbca = atan2(dir2Kbca.y, dir2Kbca.x);
 
-		if (distance(segmento.posAtual, kbca.posAtual) > minSegDistance) { segmento.posAtual += passoSegm * dir2Kbca; }  // Aumentar ou diminuir "passoSegm" para controlar a velocidade
+		if (distance(snake[1].posAtual, snake[0].posAtual) > minSegDistance) { snake[1].posAtual += passoSegm * dir2Kbca; }  // Aumentar ou diminuir "passoSegm" para controlar a velocidade
         
         // Atualiza o ângulo de rotação do segmento
-        segmento.angulo = angle2Kbca + radians(-90.0f); // Rotaciona para que a ponta aponte para o mouse
+        snake[1].angulo = angle2Kbca + radians(-90.0f); // Rotaciona para que a ponta aponte para o mouse
 
-		aplicaTransformacoes(shaderID, segmento.VAO, segmento.posAtual, segmento.angulo, segmento.dimensao, segmento.cor);
+		aplicaTransformacoes(shaderID, snake[0].VAO, snake[0].posAtual, snake[0].angulo, snake[0].dimensao, snake[0].cor);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 		//glBindVertexArray(0);	//Desconectando o buffer de geometria
 
-    	aplicaTransformacoes(shaderID, kbca.VAO, kbca.posAtual, kbca.angulo, kbca.dimensao, kbca.cor);
+    	aplicaTransformacoes(shaderID, snake[1].VAO, snake[1].posAtual, snake[1].angulo, snake[1].dimensao, snake[1].cor);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
@@ -187,7 +193,8 @@ int main() {
 		glfwSwapBuffers(window);	// Troca os buffers da tela
 	}
 	
-	glDeleteVertexArrays(1, &kbca.VAO);	// Pede pra OpenGL desalocar os buffers
+	glDeleteVertexArrays(1, &snake[1].VAO);	// Pede pra OpenGL desalocar os buffers
+	glDeleteVertexArrays(1, &snake[0].VAO);
 	
 	glfwTerminate();	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
 
@@ -400,23 +407,26 @@ int createCircle(int verticesExternos, float raio) {
 // Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 // i: Índice do segmento (0 para a cabeça, >= 1 para os segmentos do corpo)
 // dir: Vetor direção indicando a direção inicial do segmento
-Geometry createSegment(int i, vec3 dir) {
+Geometry createSegment(int i) {
+
 	cout << "Criando segmento " << i << endl;
 	
 	Geometry segment;	// Inicializa um objeto Geometry para armazenar as informações do segmento
-
+	
 	segment.VAO = createCircle(32); // Cria a geometria do segmento como um círculo
+	segment.VAO = createTriangle();
 	//segment.nVertices = 34; // Número de vértices do círculo
 
 	// Define a posição inicial de cada segmento
 	if (i == 0) { segment.posAtual = vec3(400.0, 300.0, 0.0); } // Cabeça -> Posição inicial no centro da tela
 
 	else {	// Demais segmentos													
+		vec3 dir;
 		if (i >= 2)	{ dir = normalize(cobrinha[i - 1].posAtual - cobrinha[i - 2].posAtual); } // Ajusta a direção com base na posição dos segmentos anteriores para evitar sobreposição
 		segment.posAtual = cobrinha[i - 1].posAtual + minSegDistance * dir; // Posiciona o novo segmento com uma distância mínima do segmento anterior
 	}
 	
-	segment.dimensao = vec3(50, 50, 1.0);	// Define as dimensões do segmento (tamanho do círculo)
+	segment.dimensao = vec3(segmentDim, 1.0);	// Define as dimensões do segmento (tamanho do círculo)
 
 	segment.angulo = 0.0; // Ângulo inicial (sem rotação)
 
