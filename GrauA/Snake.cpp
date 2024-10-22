@@ -1,4 +1,4 @@
-/***             SIMULANDO A COBRINHA DO SLITHER.IO               ***/
+/***             SIMULANDO A snake DO SLITHER.IO               ***/
 /*** Disciplina de Computação Gráfica - Jogos Digitais - Unisinos ***/
 /***        Alunos: Ian Rossetti Boniatti e Eduardo Tropea        ***/
 
@@ -39,12 +39,14 @@ struct Geometry {
 
 /*** Protótipos das funções ***/
 void key_callback (GLFWwindow* window, int key, int scancode, int action, int mode); // Função de callback de teclado
-int  setupShader ();		// Função responsável pela compilação e montagem do programa de shader
-int  createTriangle ();	// Função responsável pela criação do VBO e do VAO de um TRIÂNGULO
-int  createCircle (int verticesExternos, float raio = 0.5); // Função responsável pela criação do VBO e do VAO de um CÍRCULO
+int setupShader ();		// Função responsável pela compilação e montagem do programa de shader
+int createTriangle ();	// Função responsável pela criação do VBO e do VAO de um TRIÂNGULO
+int createCircle (int verticesExternos, float raio = 0.5); // Função responsável pela criação do VBO e do VAO de um CÍRCULO
+int createEyes(int nPoints);
+Geometry createSegment (int i);	// Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 Geometry createSegment (int i);	// Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 
-// Função responsápasso pela aplicação das transformações de Translação, Rotação e Escala
+// Função responsável pela aplicação das transformações de Translação, Rotação e Escala
 void aplicaTransformacoes(	GLuint shaderID,			// 1º parâmetro: identificador do programa de shader
 							GLuint VAO,					// 2º parâmetro: identificador do VAO do elemento que será processado
 							vec3 posicaoNaTela,			// 3º parâmetro: posição para onde será transladado o elemento
@@ -57,22 +59,23 @@ void aplicaTransformacoes(	GLuint shaderID,			// 1º parâmetro: identificador d
 /*** Constantes	***/
 const float Pi = 3.14159;
 const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela
-const vec2 segmentDim = vec2(40,40);
-const float passoKbca = 0.01f;	// "velocidade" de incremento na posição da cabeça
+const vec2 segmentDim = vec2(50,50);
+const float passokbca = 0.01f;	// "velocidade" de incremento na posição da cabeça
 const float passoSegm = 0.01f;	// "velocidade" de incremento na posição dos elementos seguintes
 const bool controleTeclado = false;	// false -> controle pelo mouse
 const GLuint drawingMode = GL_TRIANGLES;
-const float minSegDistance = 10.0f, maxSegDistance = 20.0f;
+const float minSegDistance = 20.0f, maxSegDistance = 30.0f;
 
 /*** Variáveis Globais	***/
 bool keys [1024];
+bool addNew = false;
 
-vector <Geometry> snake;	// Vetor que armazena todos os segmentos da cobrinha, incluindo a cabeça
-vector <Geometry> Eyes;	// Vetor que armazena os elementos dos olhos da cobrinha
+vector <Geometry> snake;	// Vetor que armazena todos os segmentos da snake, incluindo a cabeça
+//vector <Geometry> Eyes;	// Vetor que armazena os elementos dos olhos da snake
 
 //vec2 mousePos;     // Posição do cursor do mouse
-//vec3 dir2Kbca  = vec3(0.0, -1.0, 0.0); // Vetor direção do segmento para a Kbca
-//vec3 dir2Mouse = vec3(0.0, -1.0, 0.0); // Vetor direção da Kbca para o mouse
+//vec3 dir2snake[0]  = vec3(0.0, -1.0, 0.0); // Vetor direção do segmento para a snake[0]
+//vec3 dir2Mouse = vec3(0.0, -1.0, 0.0); // Vetor direção da snake[0] para o mouse
 
 
 /*** Função MAIN ***/
@@ -120,8 +123,16 @@ int main() {
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, value_ptr(projection));
 
 
-	// Criação dos elementos
-	snake.push_back(createSegment(0));
+	
+	snake.push_back(createSegment(0));	// Criação da cabeça
+	
+	Geometry eyes;
+	eyes.VAO = createEyes (32);
+	eyes.posAtual = vec3(400, 300, 0);
+	eyes.dimensao = vec3(50, 50, 1.0);
+	eyes.angulo = 0.0;
+	eyes.cor = vec3(0, 0, 0);	// Preto
+	
 	snake.push_back(createSegment(1));
 
 
@@ -147,46 +158,58 @@ int main() {
 		glfwPollEvents(); // Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 
 		// Limpa o buffer de cor	// Limpa a tela
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // define a cor de fundo (%RED, %GREEN, %BLUE, %ALPHA);
+		glClearColor(0.3f, 0.3f, 0.3f, 1.0f); // define a cor de fundo = %RED, %GREEN, %BLUE, %ALPHA;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		if (controleTeclado) {	
-			if (keys[GLFW_KEY_UP   ] || keys[GLFW_KEY_W]) { kbca.posAtual.y += passoKbca; kbca.angulo = radians(  0.0f); }
-			if (keys[GLFW_KEY_DOWN ] || keys[GLFW_KEY_S]) { kbca.posAtual.y -= passoKbca; kbca.angulo = radians(180.0f); }
-			if (keys[GLFW_KEY_LEFT ] || keys[GLFW_KEY_A]) { kbca.posAtual.x -= passoKbca; kbca.angulo = radians( 90.0f); }
-			if (keys[GLFW_KEY_RIGHT] || keys[GLFW_KEY_D]) { kbca.posAtual.x += passoKbca; kbca.angulo = radians(270.0f); }
-		}
-		else {
-	    	// Obtem a posição do mouse e calcula o vetor direção e o angulo do vetor direção
-			// Vetor direção é o vetor que aponta da posição atual do segmento para a posição do mouse)
-    	    double xPos, yPos;
-        	glfwGetCursorPos(window, &xPos, &yPos);		// Obtem a posição do mouse
-        	vec2 mousePos = vec2(xPos, height - yPos);  // Inverte o eixo Y para se alinhar à tela
+	
+	    // Obtem a posição do mouse e calcula o vetor direção e o angulo do vetor direção
+		// Vetor direção é o vetor que aponta da posição atual do segmento para a posição do mouse)
+    	double xPos, yPos;
+        glfwGetCursorPos(window, &xPos, &yPos);		// Obtem a posição do mouse
+        vec2 mousePos = vec2(xPos, height - yPos);  // Inverte o eixo Y para se alinhar à tela
     
-	    	vec3 dir2Mouse = normalize(vec3(mousePos, 0.0) - snake[0].posAtual);	// Calcula o vetor direção normalizado
-        	float angle2Mouse = atan2(dir2Mouse.y, dir2Mouse.x);	// calcula o ângulo do vetor "dir2Mouse"
+	    vec3 dir2Mouse = normalize(vec3(mousePos, 0.0) - snake[0].posAtual);	// Calcula o vetor direção normalizado
+        float angle2Mouse = atan2(dir2Mouse.y, dir2Mouse.x);	// calcula o ângulo do vetor "dir2Mouse"
 
-    		// Move o elemento suavemente na direção do mouse ou na direção dada pelas teclas
-        	if (distance(snake[0].posAtual, vec3(mousePos, 0.0)) > 0.01f) { snake[0].posAtual += passoKbca * dir2Mouse; } // Aumentar ou diminuir "passoKbca" para controlar a velocidade
+    	// Move o elemento suavemente na direção do mouse ou na direção dada pelas teclas
+        if (distance(snake[0].posAtual, vec3(mousePos, 0.0)) > 0.01f) { snake[0].posAtual += passokbca * dir2Mouse; } // Aumentar ou diminuir "passosnake[0]" para controlar a velocidade
 
-       		// Atualiza o ângulo de rotação do elemento
-        	snake[0].angulo = angle2Mouse + radians(-90.0f); // Rotaciona para que aponte para o mouse
-		}
+       	// Atualiza o ângulo de rotação do elemento
+        snake[0].angulo = angle2Mouse + radians(-90.0f); // Rotaciona para que aponte para o mouse
 
-		vec3 dir2Kbca = normalize(snake[0].posAtual - snake[1].posAtual);
-        float angle2Kbca = atan2(dir2Kbca.y, dir2Kbca.x);
+		if (addNew) { snake.push_back(createSegment(snake.size())); addNew = false; }
+		
+		eyes.posAtual = snake[0].posAtual;
+		eyes.angulo = snake[0].angulo - radians(-90.0f);
 
-		if (distance(snake[1].posAtual, snake[0].posAtual) > minSegDistance) { snake[1].posAtual += passoSegm * dir2Kbca; }  // Aumentar ou diminuir "passoSegm" para controlar a velocidade
+		for 
+		vec3 dir2kbca = normalize(snake[0].posAtual - snake[1].posAtual);
+        float angle2kbca = atan2(dir2kbca.y, dir2kbca.x);
+
+		if (distance(snake[1].posAtual, snake[0].posAtual) > minSegDistance) { snake[1].posAtual += passoSegm * dir2kbca; }  // Aumentar ou diminuir "passoSegm" para controlar a velocidade
         
         // Atualiza o ângulo de rotação do segmento
-        snake[1].angulo = angle2Kbca + radians(-90.0f); // Rotaciona para que a ponta aponte para o mouse
+        snake[1].angulo = angle2kbca + radians(-90.0f); // Rotaciona para que a ponta aponte para o mouse
 
-		aplicaTransformacoes(shaderID, snake[0].VAO, snake[0].posAtual, snake[0].angulo, snake[0].dimensao, snake[0].cor);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		// Desenha os segmentos da cobrinha e os olhos
+		for (int i = snake.size() - 1; i >= 0; i--) {
+			aplicaTransformacoes(shaderID, snake[i].VAO, snake[i].posAtual, snake[i].angulo, snake[i].dimensao, snake[i].cor);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 34);
+		}
 		//glBindVertexArray(0);	//Desconectando o buffer de geometria
 
-    	aplicaTransformacoes(shaderID, snake[1].VAO, snake[1].posAtual, snake[1].angulo, snake[1].dimensao, snake[1].cor);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+    	//aplicaTransformacoes(shaderID, snake[0].VAO, snake[0].posAtual, snake[0].angulo, snake[0].dimensao, snake[0].cor);
+		//glDrawArrays(GL_TRIANGLE_FAN, 0, 34);
+
+		// Desenha as escleras dos olhos
+		aplicaTransformacoes(shaderID, eyes.VAO, eyes.posAtual, eyes.angulo, eyes.dimensao, eyes.cor);
+		glDrawArrays(GL_TRIANGLE_FAN,   0, 34);
+		glDrawArrays(GL_TRIANGLE_FAN,  34, 34);
+		//eyes.cor = vec3(0.0f, 0.0f, 0.0f);
+		glUniform4f(glGetUniformLocation(shaderID, "inputColor"), 1, 1, 1, 1.0f);
+		glDrawArrays(GL_TRIANGLE_FAN,  68, 34);
+		glDrawArrays(GL_TRIANGLE_FAN, 102, 34);
+
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
 		
@@ -210,6 +233,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	
 	if (action == GLFW_PRESS  )	{ keys[key] = true;  }	// seta com true a posição correspondente à tecla pressionada
 	if (action == GLFW_RELEASE)	{ keys[key] = false; }	// seta com false a posição correspondente à tecla solta
+
+	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) { addNew = true; }
 	
 }
 
@@ -414,7 +439,7 @@ Geometry createSegment(int i) {
 	Geometry segment;	// Inicializa um objeto Geometry para armazenar as informações do segmento
 	
 	segment.VAO = createCircle(32); // Cria a geometria do segmento como um círculo
-	segment.VAO = createTriangle();
+	//segment.VAO = createTriangle();
 	//segment.nVertices = 34; // Número de vértices do círculo
 
 	// Define a posição inicial de cada segmento
@@ -422,8 +447,8 @@ Geometry createSegment(int i) {
 
 	else {	// Demais segmentos													
 		vec3 dir;
-		if (i >= 2)	{ dir = normalize(cobrinha[i - 1].posAtual - cobrinha[i - 2].posAtual); } // Ajusta a direção com base na posição dos segmentos anteriores para evitar sobreposição
-		segment.posAtual = cobrinha[i - 1].posAtual + minSegDistance * dir; // Posiciona o novo segmento com uma distância mínima do segmento anterior
+		if (i >= 2)	{ dir = normalize(snake[i - 1].posAtual - snake[i - 2].posAtual); } // Ajusta a direção com base na posição dos segmentos anteriores para evitar sobreposição
+		segment.posAtual = snake[i - 1].posAtual + minSegDistance * dir; // Posiciona o novo segmento com uma distância mínima do segmento anterior
 	}
 	
 	segment.dimensao = vec3(segmentDim, 1.0);	// Define as dimensões do segmento (tamanho do círculo)
@@ -435,6 +460,104 @@ Geometry createSegment(int i) {
 	else { segment.cor = vec3(1, 1, 0); } // Amarelo para segmentos de índice ímpar
 	
 	return segment;
+}
+
+
+// Cria a geometria dos olhos da cabeça, retornando o identificador do VAO
+// nPoints: Número de pontos usados para aproximar os círculos que compõem os olhos
+// radius: Raio das escleras dos olhos
+int createEyes(int nPoints) {
+
+	// Vetor para armazenar os vértices dos olhos (escleras e pupilas)
+	vector<GLfloat> vertices;
+	// Ângulo inicial e incremento para cada ponto do círculo
+	float angle = 0.0;
+	float slice = 2 * Pi / static_cast<float>(nPoints);
+	// Posições iniciais para os círculos dos olhos (escleras e pupilas)
+	float xi = 0.125f; // Posição inicial X das escleras
+	float yi = 0.3f; // Posição inicial Y das escleras
+	float radius = 0.225f; // Raio das escleras
+
+	// Olho esquerdo (esclera)
+	vertices.push_back(xi); // Xc
+	vertices.push_back(yi); // Yc
+	vertices.push_back(0.0f); // Zc
+	for (int i = 0; i < nPoints + 1; i++) {
+		float x = xi + radius * cos(angle);
+		float y = yi + radius * sin(angle);
+		float z = 0.0f;
+		vertices.push_back(x); // Coordenada X
+		vertices.push_back(y); // Coordenada Y
+		vertices.push_back(z); // Coordenada Z
+		angle += slice; // Incrementa o ângulo para o próximo ponto
+	}
+
+	// Olho direito (esclera)
+	angle = 0.0;
+	vertices.push_back(xi); // Xc
+	vertices.push_back(-yi); // Yc
+	vertices.push_back(0.0f); // Zc
+	for (int i = 0; i < nPoints + 1; i++) {
+		float x = xi + radius * cos(angle);
+		float y = -yi + radius * sin(angle);
+		float z = 0.0f;
+		vertices.push_back(x); // Coordenada X
+		vertices.push_back(y); // Coordenada Y
+		vertices.push_back(z); // Coordenada Z
+		angle += slice;
+	}
+
+	// Olho esquerdo (pupila)
+	radius = 0.18f; // Raio das pupilas
+	xi += 0.09f; // Ajuste de posição para as pupilas
+	angle = 0.0;
+	vertices.push_back(xi); // Xc
+	vertices.push_back(yi); // Yc
+	vertices.push_back(0.0f); // Zc
+	for (int i = 0; i < nPoints + 1; i++) {
+		float x = xi + radius * cos(angle);
+		float y = yi + radius * sin(angle);
+		float z = 0.0f;
+		vertices.push_back(x); // Coordenada X
+		vertices.push_back(y); // Coordenada Y
+		vertices.push_back(z); // Coordenada Z
+		angle += slice;
+	}
+
+	// Olho direito (pupila)
+	angle = 0.0;
+	vertices.push_back(xi); // Xc
+	vertices.push_back(-yi); // Yc
+	vertices.push_back(0.0f); // Zc
+	for (int i = 0; i < nPoints + 1; i++) {
+		float x = xi + radius * cos(angle);
+		float y = -yi + radius * sin(angle);
+		float z = 0.0f;
+		vertices.push_back(x); // Coordenada X
+		vertices.push_back(y); // Coordenada Y
+		vertices.push_back(z); // Coordenada Z
+		angle += slice;
+	}
+
+	// Identificadores para o VBO (Vertex Buffer Object) e VAO (Vertex Array Object)
+	GLuint VBO, VAO;
+	// Geração do identificador do VBO e vinculação
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	// Envia os dados do vetor de vértices para a GPU
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
+	// Geração do identificador do VAO e vinculação
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
+	// Configuração do ponteiro de atributos para os vértices
+	// layout (location = 0) no Vertex Shader, 3 componentes por vértice (x, y, z)
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+	// Desvincula o VBO e o VAO para evitar modificações acidentais
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	// Retorna o identificador do VAO, que será utilizado para desenhar os olhos (escleras e pupilas)
+	return VAO;
 }
 
 
