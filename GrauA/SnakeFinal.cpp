@@ -33,8 +33,13 @@ struct Geometry {
 	vec3 dimensao;	// Escala aplicada ao elemento (largura, altura)
     float angulo;   // Ângulo de rotação aplicado ao elemento	// em radianos
 	vec3 cor;       // Cor do elemento	
-//    int nVertices;  // Número de vértices a desenhar para este elemento
 };
+
+struct Hitbox {
+	int x, y; // coordenadas do canto superior esquerdo
+    int largura, altura; // dimensões da hitbox
+};
+
 
 
 /*** Protótipos das funções ***/
@@ -42,9 +47,13 @@ void key_callback (GLFWwindow* window, int key, int scancode, int action, int mo
 int setupShader ();		// Função responsável pela compilação e montagem do programa de shader
 int createTriangle ();	// Função responsável pela criação do VBO e do VAO de um TRIÂNGULO
 int createCircle (int verticesExternos, float raio = 0.5); // Função responsável pela criação do VBO e do VAO de um CÍRCULO
-int createEyes(int nPoints);
+int createSnEyes (int verticesExternos); // Função responsável pela criação do VBO e do VAO com as informações dos olhos
+int createSeed ();	// Função responsável pela criação do VBO e do VAO da semente
+
 Geometry createSegment (int i);	// Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
-int createSeed ();
+
+bool verificaColisao (Geometry,Geometry);
+
 
 // Função responsável pela aplicação das transformações de Translação, Rotação e Escala
 void aplicaTransformacoes(	GLuint shaderID,			// 1º parâmetro: identificador do programa de shader
@@ -53,20 +62,20 @@ void aplicaTransformacoes(	GLuint shaderID,			// 1º parâmetro: identificador d
 							float anguloDeRotacao,		// 4º parâmetro: rotação a ser aplicada ao elemento de acordo com o eixo de rotação determinado no 6º parâmetro
 							vec3 escala,				// 5º parâmetro: dimensão final do elemento
 							vec3 color,					// 6º parâmetro: cor do elemento
-							vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0))); // 7º parâmetro: eixo no qual se processará a rotação estipulada no 4º parâmetro. Defauld eixo "z"
+							vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0))); // 7º parâmetro: eixo no qual se processará a rotação estipulada no 4º parâmetro. Defauld -> eixo "z"
 						
 
 /*** Constantes	***/
 const float Pi = 3.14159;
 const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela
-const vec2 segmentDim = vec2(50,50), seedDim = vec2(10,10);
-const float smoothFactor = 1.2f;	// "velocidade" de incremento na posição dos elementos
+const vec2 segmentDim = vec2( 50, 50), seedDim = vec2( 10, 10);	// dimensões dos elementos
+const vec2 posInicial = vec2(400,300); // posição inicial da cabeça e dos olhos
+float smoothFactor = 0.01f;	// "velocidade" de incremento na posição dos elementos
 const bool controleTeclado = false;	// false -> controle pelo mouse
-//const GLuint drawingMode = GL_TRIANGLES;
-const float minSegDistance = 08.0f, maxSegDistance = 10.0f;
+const float minSegDistance = 8.0f, maxSegDistance = 10.0f;	// DistÂncia mínima e máxima entre os elementos da cobra
 
 /*** Variáveis Globais	***/
-bool keys [1024];
+bool keys [1024];		// para identificar as teclas pressionadas
 bool addNew = false;
 
 vector <Geometry> snake;	// Vetor que armazena todos os segmentos da snake, incluindo a cabeça
@@ -78,7 +87,7 @@ vector <Geometry> snake;	// Vetor que armazena todos os segmentos da snake, incl
 
 
 /*** Função MAIN ***/
-int main() {
+int main () {
 
 	// GLFW: Inicialização e configurações de versão do OpenGL
 	glfwInit();	// Inicialização da GLFW
@@ -126,19 +135,22 @@ int main() {
 	snake.push_back(createSegment(0));	// Criação da cabeça
 	
 	Geometry eyes;	// Criação dos olhos
-	eyes.VAO = createEyes (32);
-	eyes.posAtual = vec3(400, 300, 0);
+	eyes.VAO = createSnEyes (32);
+	eyes.posAtual = vec3(posInicial, 0.0);
 	eyes.dimensao = vec3(segmentDim, 1.0);
 	eyes.angulo = 0.0;
 	eyes.cor = vec3(0, 0, 0);	// Preto
 
+	srand(time(NULL));	// "semente" para o rand()
 
 	Geometry seed;
 	seed.VAO = createSeed ();
-	seed.posAtual = vec3(100, 100, 0);
+	seed.posAtual = vec3((int)(WIDTH*rand())/RAND_MAX, (int)(HEIGHT*rand())/RAND_MAX, 0);
 	seed.dimensao = vec3(seedDim, 1.0);
 	seed.angulo = radians(45.0f);
 	seed.cor = vec3(0, 1, 0);	// Verde
+
+	cout << seed.posAtual.x << " "  << seed.posAtual.y << endl;
 
 
 	bool colidiu = false;
@@ -148,24 +160,13 @@ int main() {
 		
 		glfwPollEvents(); // Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 
-		Geometry head = snake[0];
+		colidiu = verificaColisao (snake[0],seed);
 
-		if (head.posAtual.x > seed.posAtual.x) {
-			if ((seed.posAtual.x + seed.dimensao.x) >= (head.posAtual.x - head.dimensao.x)) {colidiu = true;}
-		} 
-		else if (head.posAtual.x < seed.posAtual.x) {
-			if ((seed.posAtual.x - seed.dimensao.x) <= (head.posAtual.x + head.dimensao.x)) {colidiu = true;}
+		if (colidiu) {
+			snake.push_back(createSegment(snake.size()));
+			seed.posAtual = vec3((int)(WIDTH*rand())/RAND_MAX, (int)(HEIGHT*rand())/RAND_MAX, 0);
+			colidiu = false;
 		}
-		
-		if (head.posAtual.y > seed.posAtual.y) {
-			if ((seed.posAtual.y + seed.dimensao.y) >= (head.posAtual.y - head.dimensao.y)) {colidiu = true;}
-		} 
-		else if (head.posAtual.y < seed.posAtual.y) {
-			if ((seed.posAtual.y - seed.dimensao.y) <= (head.posAtual.y + head.dimensao.y)) {colidiu = true;}
-		}
-
-
-		if (colidiu) { snake.push_back(createSegment(snake.size())); colidiu = false; seed.posAtual=vec3(700,500,0); }
 
 		// Limpa o buffer de cor	// Limpa a tela
 		glClearColor(0.3f, 0.3f, 0.3f, 1.0f); // define a cor de fundo = %RED, %GREEN, %BLUE, %ALPHA;
@@ -246,14 +247,17 @@ int main() {
 
 // Função de callback de teclado - só pode ter uma instância (deve ser estática se estiver dentro de uma classe)
 // É chamada sempre que uma tecla for pressionada ou solta via GLFW
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode) {
+void key_callback (GLFWwindow* window, int key, int scancode, int action, int mode) {
 
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {glfwSetWindowShouldClose(window, GL_TRUE);}
 	
 	if (action == GLFW_PRESS  )	{ keys[key] = true;  }	// seta com true a posição correspondente à tecla pressionada
 	if (action == GLFW_RELEASE)	{ keys[key] = false; }	// seta com false a posição correspondente à tecla solta
 
-	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) { addNew = true; }
+	//if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) { addNew = true; }
+
+	if (key == GLFW_KEY_F1 && action == GLFW_PRESS) { smoothFactor = smoothFactor*2; }
+	if (key == GLFW_KEY_F2 && action == GLFW_PRESS) { smoothFactor = smoothFactor/2; }
 	
 }
 
@@ -262,7 +266,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 // Por enquanto, neste código, um único e simples programa de shader
 // Os códigos fonte do vertex shader e do fragment shader estão nos arrays vertexShaderSource e fragmentShaderSource no iniçio deste arquivo
 // A função retorna o identificador do programa de shader (em "main" teremos shaderID = setupShader(), que equivale a shaderID = shaderProgram)
-int setupShader() {	/*** Função para gerar o programa de shader ***/
+int setupShader () {	/*** Função para gerar o programa de shader ***/
 
 	// Código fonte do Vertex Shader (em GLSL - Graphics Library Shading Language)
 	const GLchar* vertexShaderSource = R"(
@@ -340,7 +344,7 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 // Por enquanto, o atributo de cor é enviado externamente por uma variável tipo "uniform" chamada "inputColor"
 // Por enquanto, 1 VBO com as coordenadas, VAO com apenas 1 ponteiro para atributo
 // A função retorna o identificador do VAO (em "main" teremos VAOm = setupShader(), que equivale a VAOm = VAO)
-int createTriangle() {
+int createTriangle () {
 
 	// Aqui setamos as coordenadas x, y e z do triângulo e as armazenamos de forma sequencial, já visando mandar para o VBO (Vertex Buffer Objects)
 	// Cada atributo do vértice (coordenada, cores, coordenadas de textura, normal, etc) pode ser arazenado em um VBO único ou em VBOs separados
@@ -393,7 +397,7 @@ int createTriangle() {
 
 
 // Função responsável pela criação do VBO e do VAO dos Circulos 
-int createCircle(int verticesExternos, float raio) {
+int createCircle (int verticesExternos, float raio) {
 	
 	vector <GLfloat> vertices;
 
@@ -451,7 +455,7 @@ int createCircle(int verticesExternos, float raio) {
 // Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 // i: Índice do segmento (0 para a cabeça, >= 1 para os segmentos do corpo)
 // dir: Vetor direção indicando a direção inicial do segmento
-Geometry createSegment(int i) {
+Geometry createSegment (int i) {
 
 	cout << "Criando segmento " << i << endl;
 	
@@ -461,7 +465,6 @@ Geometry createSegment(int i) {
 
 	// Define a posição inicial de cada segmento
 	if (i == 0) { segment.posAtual = vec3(400.0, 300.0, 0.0); } // Cabeça -> Posição inicial no centro da tela
-
 	else {	// Demais segmentos													
 		vec3 dir = normalize(snake[i].posAtual - snake[i - 1].posAtual);
 		if (i >= 2)	{ dir = normalize(snake[i - 1].posAtual - snake[i - 2].posAtual); } // Ajusta a direção com base na posição dos segmentos anteriores para evitar sobreposição
@@ -482,9 +485,7 @@ Geometry createSegment(int i) {
 
 
 // Cria a geometria dos olhos da cabeça, retornando o identificador do VAO
-// nPoints: Número de pontos usados para aproximar os círculos que compõem os olhos
-// radius: Raio das escleras dos olhos
-int createEyes(int nPoints) {
+int createSnEyes (int nPoints) {
 
 	// Vetor para armazenar os vértices dos olhos (escleras e pupilas)
 	vector<GLfloat> vertices;
@@ -578,7 +579,7 @@ int createEyes(int nPoints) {
 	return VAO;
 }
 
-
+// Cria a geometria das "sementes", retornando o identificador do VAO
 int createSeed () {
 	
 	GLfloat vertices[] = {
@@ -621,6 +622,17 @@ int createSeed () {
 	glBindVertexArray(0); // Desvincula o VAO (é uma boa prática desvincular qualquer buffer ou array para evitar bugs medonhos)
 
 	return VAO; 
+}
+
+
+// Verifica a colisão entre duas geometrias através dos respetivos hitbox
+bool verificaColisao (Geometry h1, Geometry h2) {	// adaptado da internet
+
+	// Verifica se as hitboxes se sobrepõem em x e y
+    if ( (h1.posAtual.x + h1.dimensao.x/2) < (h2.posAtual.x - h2.dimensao.x/2) || (h2.posAtual.x + h2.dimensao.x/2) < (h1.posAtual.x - h1.dimensao.x/2)) return false;
+    if ( (h1.posAtual.y + h1.dimensao.y/2) < (h2.posAtual.y - h2.dimensao.y/2) || (h2.posAtual.y + h2.dimensao.y/2) < (h1.posAtual.y - h1.dimensao.y/2)) return false;
+        
+    return true;	// Se passou pelas verificações, há colisão
 }
 
 
