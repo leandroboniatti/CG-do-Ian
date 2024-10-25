@@ -1,7 +1,7 @@
 /***             SIMULANDO A snake DO SLITHER.IO               ***/
 /*** Disciplina de Computação Gráfica - Jogos Digitais - Unisinos ***/
 /***        Alunos: Ian Rossetti Boniatti e Eduardo Tropea        ***/
-
+/***  v:241024	***/
 
 /*** INCLUDES ***/
 #include <iostream>
@@ -43,7 +43,6 @@ int createTriangle ();	// Função responsável pela criação do VBO e do VAO d
 int createCircle (int verticesExternos, float raio = 0.5); // Função responsável pela criação do VBO e do VAO de um CÍRCULO
 int createSnEyes (int verticesExternos); // Função responsável pela criação do VBO e do VAO com as informações dos olhos
 int createSeed ();	// Função responsável pela criação do VBO e do VAO da semente
-void atualizaSegmentos ();
 
 Geometry createSegment (int i);	// Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 
@@ -634,12 +633,6 @@ int createSeed () {
 	glBindVertexArray(0); // Desvincula o VAO (é uma boa prática desvincular qualquer buffer ou array para evitar bugs medonhos)
 
 	return VAO; 
-}
-
-
-void atualizaSegmentos () {
-
-
 }
 
 

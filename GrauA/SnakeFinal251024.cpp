@@ -1,7 +1,7 @@
 /***             SIMULANDO A snake DO SLITHER.IO               ***/
 /*** Disciplina de Computação Gráfica - Jogos Digitais - Unisinos ***/
 /***        Alunos: Ian Rossetti Boniatti e Eduardo Tropea        ***/
-
+/***  v:251024	***/
 
 /*** INCLUDES ***/
 #include <iostream>
@@ -29,17 +29,11 @@ enum Directions {NONE, UP, DOWN, LEFT, RIGHT};
 // Estrutura para armazenar informações sobre um determinado elemento
 struct Geometry { 
 	GLuint VAO;		// Vertex Array Geometry do elemento
-	vec3 posAtual;	// Posição atual do elemento
+	vec3 posicao;	// Posição atual do elemento
 	vec3 dimensao;	// Escala aplicada ao elemento (largura, altura)
     float angulo;   // Ângulo de rotação aplicado ao elemento	// em radianos
 	vec3 cor;       // Cor do elemento	
 };
-
-struct Hitbox {
-	int x, y; // coordenadas do canto superior esquerdo
-    int largura, altura; // dimensões da hitbox
-};
-
 
 
 /*** Protótipos das funções ***/
@@ -54,36 +48,39 @@ Geometry createSegment (int i);	// Cria um segmento e retorna um objeto Geometry
 
 bool verificaColisao (Geometry,Geometry);
 
-
 // Função responsável pela aplicação das transformações de Translação, Rotação e Escala
-void aplicaTransformacoes(	GLuint shaderID,			// 1º parâmetro: identificador do programa de shader
+void aplicaTransformacoes (	GLuint shaderID,			// 1º parâmetro: identificador do programa de shader
 							GLuint VAO,					// 2º parâmetro: identificador do VAO do elemento que será processado
 							vec3 posicaoNaTela,			// 3º parâmetro: posição para onde será transladado o elemento
 							float anguloDeRotacao,		// 4º parâmetro: rotação a ser aplicada ao elemento de acordo com o eixo de rotação determinado no 6º parâmetro
 							vec3 escala,				// 5º parâmetro: dimensão final do elemento
 							vec3 color,					// 6º parâmetro: cor do elemento
-							vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0))); // 7º parâmetro: eixo no qual se processará a rotação estipulada no 4º parâmetro. Defauld -> eixo "z"
-						
+							vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0)) ); // 7º parâmetro: eixo no qual se processará a rotação estipulada no 4º parâmetro. Defauld -> eixo "z"
+
+// Sobrecarga da função responsável pela aplicação das transformações de Translação, Rotação e Escala
+void aplicaTransformacoes (	GLuint shaderID, Geometry elemento, vec3 eixoDeRotacao = vec3(0.0, 0.0, 1.0) );
+														// 1º parâmetro: identificador do programa de shader
+														// 2º parâmetro: elemento (Geometry) que será processado
+														// 3º parâmetro: eixo no qual se processará a rotação do elemento. Defauld -> eixo "z"
+
 
 /*** Constantes	***/
 const float Pi = 3.14159;
 const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela
-const vec2 segmentDim = vec2( 50, 50), seedDim = vec2( 10, 10);	// dimensões dos elementos
-const vec2 posInicial = vec2(400,300); // posição inicial da cabeça e dos olhos
-float smoothFactor = 0.01f;	// "velocidade" de incremento na posição dos elementos
-const bool controleTeclado = false;	// false -> controle pelo mouse
-const float minSegDistance = 8.0f, maxSegDistance = 10.0f;	// DistÂncia mínima e máxima entre os elementos da cobra
+const float segmentDim = 50,  seedDim = 10;	// dimensões dos elementos
+const vec2 headPosInicial = vec2(400,300); // posição inicial da cabeça e dos olhos
+float segmentFactor = 0.1f, headFactor = 0.05f; // "velocidades" de incremento na posição dos elementos
+const float minSegDistance = 10.0f, maxSegDistance = 15.0f;	// Distância mínima e máxima entre os elementos da cobra
 
 /*** Variáveis Globais	***/
-bool keys [1024];		// para identificar as teclas pressionadas
-bool addNew = false;
+bool keys [1024];	// para identificar as teclas pressionadas
 
 vector <Geometry> snake;	// Vetor que armazena todos os segmentos da snake, incluindo a cabeça
-//vector <Geometry> Eyes;	// Vetor que armazena os elementos dos olhos da snake
 
-//vec2 mousePos;     // Posição do cursor do mouse
-//vec3 dir2snake[0]  = vec3(0.0, -1.0, 0.0); // Vetor direção do segmento para a snake[0]
-//vec3 dir2Mouse = vec3(0.0, -1.0, 0.0); // Vetor direção da snake[0] para o mouse
+vec3 mousePosition;	// Posição do cursor do mouse	
+
+bool colidiu = false;
+
 
 
 /*** Função MAIN ***/
@@ -99,10 +96,8 @@ int main () {
 	glfwMakeContextCurrent(window);
 	glfwSetKeyCallback(window, key_callback);	// Registro da função de callback para a janela GLFW
 	
-
 	// GLAD: carrega todos os ponteiros de funções da OpenGL
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) { cout << "Failed to initialize GLAD" << std::endl; }
-
 
 	// Obtendo as informações de versão da placa de vídeo
 	const GLubyte* renderer = glGetString(GL_RENDERER); /* get renderer string */
@@ -110,12 +105,10 @@ int main () {
 	cout << "Renderer: " << renderer << endl;
 	cout << "OpenGL version supported " << version << endl;
 
-
 	// Definindo as dimensões da viewport com as mesmas dimensões da janela da aplicação
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
 	glViewport(0, 0, width, height);
-
 
 	// Compilando e montando o programa de shader
 	GLuint shaderID = setupShader(); // Retorna o identificador OpenGL para o programa de shader
@@ -124,6 +117,7 @@ int main () {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_ALWAYS); // Sempre passará no teste de profundidade (desnecessário se não houver profundidade)
 
+	// Informa qual programa de shader usará, no caso -> shaderID
 	glUseProgram(shaderID);
 
 	// Aplica a Matriz de projeção paralela ortográfica (usada para desenhar em 2D)
@@ -136,8 +130,8 @@ int main () {
 	
 	Geometry eyes;	// Criação dos olhos
 	eyes.VAO = createSnEyes (32);
-	eyes.posAtual = vec3(posInicial, 0.0);
-	eyes.dimensao = vec3(segmentDim, 1.0);
+	eyes.posicao = vec3(headPosInicial, 0.0);
+	eyes.dimensao = vec3(segmentDim, segmentDim, 1.0);
 	eyes.angulo = 0.0;
 	eyes.cor = vec3(0, 0, 0);	// Preto
 
@@ -145,78 +139,94 @@ int main () {
 
 	Geometry seed;
 	seed.VAO = createSeed ();
-	seed.posAtual = vec3((int)(WIDTH*rand())/RAND_MAX, (int)(HEIGHT*rand())/RAND_MAX, 0);
-	seed.dimensao = vec3(seedDim, 1.0);
+	seed.posicao = vec3((int)(WIDTH*rand())/RAND_MAX, (int)(HEIGHT*rand())/RAND_MAX, 0);	// posição pseudo-aleatória
+	seed.dimensao = vec3(seedDim, seedDim, 1.0);
 	seed.angulo = radians(45.0f);
 	seed.cor = vec3(0, 1, 0);	// Verde
 
-	cout << seed.posAtual.x << " "  << seed.posAtual.y << endl;
+	cout << "semente na posição (" << seed.posicao.x << "," << seed.posicao.y << ")" << endl;
 
-
-	bool colidiu = false;
 
 	/*** Loop da aplicação - "game loop" ***/
 	while (!glfwWindowShouldClose(window))	{
 		
 		glfwPollEvents(); // Checa se houveram eventos de input (key pressed, mouse moved etc.) e chama as funções de callback correspondentes
 
-		colidiu = verificaColisao (snake[0],seed);
-
-		if (colidiu) {
-			snake.push_back(createSegment(snake.size()));
-			seed.posAtual = vec3((int)(WIDTH*rand())/RAND_MAX, (int)(HEIGHT*rand())/RAND_MAX, 0);
-			colidiu = false;
-		}
-
 		// Limpa o buffer de cor	// Limpa a tela
 		glClearColor(0.3f, 0.3f, 0.3f, 1.0f); // define a cor de fundo = %RED, %GREEN, %BLUE, %ALPHA;
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	
-	    // Obtem a posição do mouse e calcula o vetor direção e seu angulo
-		double xPos, yPos;
-        glfwGetCursorPos(window, &xPos, &yPos);		// Obtem a posição do mouse
-        vec2 mousePos = vec2(xPos, height - yPos);  // Inverte o eixo Y para se alinhar à tela
-    
-	    vec3 dir2Mouse = normalize(vec3(mousePos, 0.0) - snake[0].posAtual);	// Calcula o vetor direção normalizado
-        
-    	// Move o elemento suavemente na direção do mouse ou na direção dada pelas teclas
-        if (distance(snake[0].posAtual, vec3(mousePos, 0.0)) > 0.01f) { snake[0].posAtual += smoothFactor * dir2Mouse; } // Aumentar ou diminuir "smoothFactor" para controlar a velocidade
+		colidiu = verificaColisao (snake[0],seed);
 
-       	// Atualiza o ângulo de rotação do elemento
-		snake[0].angulo = atan2(dir2Mouse.y, dir2Mouse.x) + radians(-90.0f); // calcula o ângulo do vetor "dir2Mouse" e atribui a cabeça
-
-		eyes.posAtual = snake[0].posAtual;
-		eyes.angulo = snake[0].angulo - radians(-90.0f);
-		
-		
-		for (int i = 1; i < snake.size(); i++) {
-			
-			vec3 dirSegment = normalize(snake[i-1].posAtual - snake[i].posAtual);	// vetor direção normalizado
-			float distSegment =  length(snake[i-1].posAtual - snake[i].posAtual);	// distância entre os segmentos
-
-			// Calcula a nova posição do segmento com suavidade, respeitando as distâncias mínima e máxima
-			vec3 targetPosition = snake[i].posAtual;
-			float dynamicSmoothFactor = smoothFactor * (distSegment / maxSegDistance);
-
-			if      (distSegment < minSegDistance) { targetPosition = snake[i].posAtual + (distSegment - minSegDistance) * dirSegment; }
-			else if (distSegment > maxSegDistance) { targetPosition = snake[i].posAtual + (distSegment - maxSegDistance) * dirSegment; }
-			
-        	// Interpolação suave para a nova posição do segmento
-			snake[i].posAtual = mix(snake[i].posAtual, targetPosition, dynamicSmoothFactor);
-
-        	// Atualiza o ângulo de rotação do segmento
-        	snake[i].angulo = atan2(dirSegment.y, dirSegment.x) + radians(-90.0f); // Rotaciona para que a ponta aponte para o mouse
+		if (colidiu) {	// Se aconteceu colisão cria um novo segmento da cobra e uma nova semente em outra posição 
+			snake.push_back(createSegment(snake.size()));
+			seed.posicao = vec3((int)(WIDTH*rand())/RAND_MAX, (int)(HEIGHT*rand())/RAND_MAX, 0);	// posição pseudo-aleatória
+			cout << "semente na posição (" << seed.posicao.x << "," << seed.posicao.y << ")" << endl;
+			colidiu = false;
 		}
 
-		// Desenha os segmentos da cobrinha e os olhos
+		double xPos, yPos;
+		glfwGetCursorPos(window, &xPos, &yPos);		   // Obtem a posição do mouse e salva em xPos e yPos
+		mousePosition = vec3(xPos, height - yPos, 0);  // Inverte o eixo Y para se alinhar à tela		
+
+		// Calcula a direção e a distância entre mouse e cabeça
+		vec3 dir2Mouse = normalize(mousePosition - snake[0].posicao);	// Calcula o vetor direção normalizado
+		float dist2Mouse =  length(mousePosition - snake[0].posicao);	// distância entre os segmentos
+				
+		// Move o elemento suavemente na direção do mouse
+		// 1ª Versão: funciona mas quando chega na posição do mouse a imagem da cabeça e olhos pode ficar mudando de posição rapidamente
+		//if (dist2Mouse > headFactor) { snake[0].posicao += headFactor * dir2Mouse; } // Aumentar ou diminuir "headFactor" para controlar a velocidade
+		
+		// 2ª Versão: funciona mas quando chega perto da posição do mouse desacelera muito
+		float dynamicSmoothFactor = headFactor * (dist2Mouse / maxSegDistance);
+		vec3 targetPositionHead = snake[0].posicao;
+		//vec3 targetPositionHead = mousePosition;
+		if      (dist2Mouse < minSegDistance) { targetPositionHead = snake[0].posicao - headFactor * dir2Mouse; }
+		else if (dist2Mouse > maxSegDistance) { targetPositionHead = snake[0].posicao + headFactor * dir2Mouse; }
+		snake[0].posicao = mix(snake[0].posicao, targetPositionHead, dynamicSmoothFactor);	// Interpolação suave para a nova posição do segmento
+	
+		// 3ª Versão: cabeça fica "colada" no mouse e os segmentos não ficam com os espaçamentos uniformes
+		//float dynamicSmoothFactor = headFactor * (dist2Mouse / maxSegDistance);
+		//vec3 targetPositionHead = snake[0].posicao;	// ou
+		//vec3 targetPositionHead = mousePosition;
+		//if      (dist2Mouse < minSegDistance) { targetPositionHead = snake[0].posicao + (dist2Mouse - minSegDistance) * dir2Mouse; }
+		//else if (dist2Mouse > maxSegDistance) { targetPositionHead = snake[0].posicao + (dist2Mouse - maxSegDistance) * dir2Mouse; }
+		//snake[0].posicao = mix(snake[0].posicao, targetPositionHead, dynamicSmoothFactor);	// Interpolação suave para a nova posição do segmento				
+		
+		// Atualiza o ângulo de rotação da cabeça
+		snake[0].angulo = atan2(dir2Mouse.y, dir2Mouse.x) + radians(-90.0f); // calcula o ângulo do vetor "dir2Target" e atribui a cabeça
+
+		// Atualiza a posição e o ângulo de rotação dos olhos
+		eyes.posicao = snake[0].posicao;
+		eyes.angulo = snake[0].angulo - radians(-90.0f);	
+
+		// Atualiza a posição e o ângulo do restante dos segmentos
+		for (int i = 1; i < snake.size(); i++) {
+	
+			vec3 dir2Segment = normalize(snake[i-1].posicao - snake[i].posicao);	// vetor direção normalizado
+			float dist2Segment =  length(snake[i-1].posicao - snake[i].posicao);	// distância entre os segmentos
+
+			// Calcula a nova posição do segmento com suavidade, respeitando as distâncias mínima e máxima
+			float dynamicSmoothFactor = segmentFactor * (dist2Segment / maxSegDistance);
+			vec3 targetPosition = snake[i-1].posicao;
+			if      (dist2Segment < minSegDistance) { targetPosition = snake[i].posicao + (dist2Segment - minSegDistance) * dir2Segment; }
+			else if (dist2Segment > maxSegDistance) { targetPosition = snake[i].posicao + (dist2Segment - maxSegDistance) * dir2Segment; }
+			
+			// Interpolação suave para a nova posição do segmento
+			snake[i].posicao = mix(snake[i].posicao, targetPosition, dynamicSmoothFactor);
+
+			// Atualiza o ângulo de rotação do segmento
+			snake[i].angulo = atan2(dir2Segment.y, dir2Segment.x) + radians(-90.0f);
+		}
+
+		// Desenha os segmentos da cobra
 		for (int i = snake.size() - 1; i >= 0; i--) {
-			aplicaTransformacoes(shaderID, snake[i].VAO, snake[i].posAtual, snake[i].angulo, snake[i].dimensao, snake[i].cor);
+			aplicaTransformacoes(shaderID, snake[i]);
 			glDrawArrays(GL_TRIANGLE_FAN, 0, 34);
 		}
 	
 		// Desenha as escleras dos olhos
-		aplicaTransformacoes(shaderID, eyes.VAO, eyes.posAtual, eyes.angulo, eyes.dimensao, eyes.cor);
+		aplicaTransformacoes(shaderID, eyes);
 		glDrawArrays(GL_TRIANGLE_FAN,   0, 34);
 		glDrawArrays(GL_TRIANGLE_FAN,  34, 34);
 		
@@ -225,12 +235,9 @@ int main () {
 		glDrawArrays(GL_TRIANGLE_FAN,  68, 34);
 		glDrawArrays(GL_TRIANGLE_FAN, 102, 34);
 
-
 		// Desenha a semente
-		aplicaTransformacoes(shaderID, seed.VAO, seed.posAtual, seed.angulo, seed.dimensao, seed.cor);
+		aplicaTransformacoes(shaderID, seed);
 		glDrawArrays(GL_TRIANGLE_FAN,   0, 4);
-
-
 
 		glBindVertexArray(0);	//Desconectando o buffer de geometria
 		
@@ -238,7 +245,9 @@ int main () {
 	}
 	
 	for (int i = 0; i < snake.size() - 1; i++) { glDeleteVertexArrays(1, &snake[i].VAO); } // Pede pra OpenGL desalocar os buffers
-	
+												 glDeleteVertexArrays(1, &eyes.VAO);
+												 glDeleteVertexArrays(1, &seed.VAO);
+
 	glfwTerminate();	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
 
 	return 0;
@@ -256,8 +265,8 @@ void key_callback (GLFWwindow* window, int key, int scancode, int action, int mo
 
 	//if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) { addNew = true; }
 
-	if (key == GLFW_KEY_F1 && action == GLFW_PRESS) { smoothFactor = smoothFactor*2; }
-	if (key == GLFW_KEY_F2 && action == GLFW_PRESS) { smoothFactor = smoothFactor/2; }
+	if (key == GLFW_KEY_F1 && action == GLFW_PRESS) { headFactor = headFactor*2; }
+	if (key == GLFW_KEY_F2 && action == GLFW_PRESS) { headFactor = headFactor/2; }
 	
 }
 
@@ -454,7 +463,6 @@ int createCircle (int verticesExternos, float raio) {
 
 // Cria um segmento e retorna um objeto Geometry com a posição e cor apropriadas
 // i: Índice do segmento (0 para a cabeça, >= 1 para os segmentos do corpo)
-// dir: Vetor direção indicando a direção inicial do segmento
 Geometry createSegment (int i) {
 
 	cout << "Criando segmento " << i << endl;
@@ -463,18 +471,20 @@ Geometry createSegment (int i) {
 	
 	segment.VAO = createCircle(32); // Cria a geometria do segmento como um círculo
 
+	vec3 dir;
+
 	// Define a posição inicial de cada segmento
-	if (i == 0) { segment.posAtual = vec3(400.0, 300.0, 0.0); } // Cabeça -> Posição inicial no centro da tela
-	else {	// Demais segmentos													
-		vec3 dir = normalize(snake[i].posAtual - snake[i - 1].posAtual);
-		if (i >= 2)	{ dir = normalize(snake[i - 1].posAtual - snake[i - 2].posAtual); } // Ajusta a direção com base na posição dos segmentos anteriores para evitar sobreposição
-		segment.posAtual = snake[i - 1].posAtual + minSegDistance * dir; // Posiciona o novo segmento com uma distância mínima do segmento anterior
+	if (i == 0) { segment.posicao = vec3(400.0, 300.0, 0.0); } // Cabeça -> Posição inicial no centro da tela
+	else {	// Demais segmentos - Ajusta a direção com base na posição dos segmentos anteriores para evitar sobreposição											
+		if (i == 1) { dir = normalize(snake[i - 1].posicao - mousePosition); }
+		else { dir = normalize(snake[i - 1].posicao - snake[i - 2].posicao); } 
+		segment.posicao = snake[i - 1].posicao + minSegDistance * dir; // Posiciona o novo segmento com uma distância mínima do segmento anterior
 		segment.angulo = atan2(dir.y, dir.x) + radians(-90.0f);
 	}
 	
-	segment.dimensao = vec3(segmentDim, 1.0);	// Define as dimensões do segmento (tamanho do círculo)
+	segment.dimensao = vec3(segmentDim, segmentDim, 1.0);	// Define as dimensões do segmento (tamanho do círculo)
 
-	segment.angulo = 0.0; // Ângulo inicial (sem rotação)
+	//segment.angulo = 0.0; // Ângulo inicial (sem rotação)
 
 	// Alterna a cor do segmento entre azul e amarelo, dependendo do índice
 	if (i % 2 == 0) { segment.cor = vec3(0, 0, 1); } // Azul para segmentos de índice par
@@ -579,6 +589,7 @@ int createSnEyes (int nPoints) {
 	return VAO;
 }
 
+
 // Cria a geometria das "sementes", retornando o identificador do VAO
 int createSeed () {
 	
@@ -628,11 +639,13 @@ int createSeed () {
 // Verifica a colisão entre duas geometrias através dos respetivos hitbox
 bool verificaColisao (Geometry h1, Geometry h2) {	// adaptado da internet
 
-	// Verifica se as hitboxes se sobrepõem em x e y
-    if ( (h1.posAtual.x + h1.dimensao.x/2) < (h2.posAtual.x - h2.dimensao.x/2) || (h2.posAtual.x + h2.dimensao.x/2) < (h1.posAtual.x - h1.dimensao.x/2)) return false;
-    if ( (h1.posAtual.y + h1.dimensao.y/2) < (h2.posAtual.y - h2.dimensao.y/2) || (h2.posAtual.y + h2.dimensao.y/2) < (h1.posAtual.y - h1.dimensao.y/2)) return false;
-        
-    return true;	// Se passou pelas verificações, há colisão
+	// Verifica se as hitboxes retangulares se sobrepõem em x e y
+    //if ( (h1.posicao.x + h1.dimensao.x/2) < (h2.posicao.x - h2.dimensao.x/2) || (h2.posicao.x + h2.dimensao.x/2) < (h1.posicao.x - h1.dimensao.x/2)) return false;
+    //if ( (h1.posicao.y + h1.dimensao.y/2) < (h2.posicao.y - h2.dimensao.y/2) || (h2.posicao.y + h2.dimensao.y/2) < (h1.posicao.y - h1.dimensao.y/2)) return false;
+    //return true;	// Se passou pelas verificações, há colisão
+
+	// Verifica se a distância é menor que a soma dos raios (hitbox circular)
+    return (distance(h1.posicao, h2.posicao) <= (segmentDim + seedDim) / 2);
 }
 
 
@@ -653,4 +666,23 @@ void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float
 
 	// Cores sendo enviadas para "inputColor"
 	glUniform4f(glGetUniformLocation(shaderID, "inputColor"), color.r, color.g, color.b , 1.0f);
+}
+
+
+// Sobrecarga da Função responsável pela aplicação das transformações de Translação, Rotação e Escala
+// Sugestão da profe no "passo-a-passo para o trabalho"
+void aplicaTransformacoes(GLuint shaderID, Geometry elemento, vec3 eixoDeRotacao) {
+
+	glBindVertexArray(elemento.VAO); // Vincula o VAO
+	
+	mat4 model = mat4(1); // salva em model a matriz identidade 4x4 (Matriz de modelo inicial)
+	model = translate(model,elemento.posicao);
+	model = rotate(model,elemento.angulo,eixoDeRotacao);
+	model = scale(model,elemento.dimensao);
+	
+	// Transformações sendo enviadas para "model"
+	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
+
+	// Cores sendo enviadas para "inputColor"
+	glUniform4f(glGetUniformLocation(shaderID, "inputColor"), elemento.cor.r, elemento.cor.g, elemento.cor.b, 1.0f);
 }
