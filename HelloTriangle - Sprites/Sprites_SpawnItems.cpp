@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string>
 #include <assert.h>
+#include <vector>
 
 using namespace std;
 
@@ -30,19 +31,18 @@ using namespace glm;
 
 #include <cmath>
 
-
-//Estrutura de dados das Sprites
-struct Sprite 
+// Estrutura de dados das Sprites
+struct Sprite
 {
-	GLfloat VAO; //id do buffer de geometria
-	GLfloat texID; //id da textura
+	GLfloat VAO;   // id do buffer de geometria
+	GLfloat texID; // id da textura
 	vec3 pos, dimensions;
 	float angle;
-	//Para a animação da spritesheet
+	// Para a animação da spritesheet
 	int nAnimations, nFrames;
 	int iAnimation, iFrame;
 	float ds, dt;
-	//Para a movimentação do sprite
+	// Para a movimentação do sprite
 	float vel;
 };
 
@@ -53,17 +53,16 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 int setupShader();
 int setupGeometry();
 int setupSprite();
-Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations=1, int nFrames=1, float vel = 1.5, float angle=0.0);
+Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations = 1, int nFrames = 1, float vel = 1.5, float angle = 0.0);
 GLuint loadTexture(string filePath, int &width, int &height);
 
-void drawTriangle(GLuint shaderID, GLuint VAO, vec3 position, vec3 dimensions, float angle=0.0f, vec3 color = vec3(0,0,0), vec3 axis = (vec3(0.0, 0.0, 1.0)));
+void drawTriangle(GLuint shaderID, GLuint VAO, vec3 position, vec3 dimensions, float angle = 0.0f, vec3 color = vec3(0, 0, 0), vec3 axis = (vec3(0.0, 0.0, 1.0)));
 void drawSprite(GLuint shaderID, Sprite &sprite);
 void updateSprite(GLuint shaderID, Sprite &sprite);
 void moveSprite(GLuint shaderID, Sprite &sprite);
 
 void updateItems(GLuint shader, Sprite &sprite);
-
-
+void spawnItem(Sprite &sprite);
 
 // Dimensões da janela (pode ser alterado em tempo de execução)
 const GLuint WIDTH = 800, HEIGHT = 600;
@@ -72,10 +71,14 @@ const GLuint WIDTH = 800, HEIGHT = 600;
 float FPS = 12.0f;
 float lastTime = 0;
 bool keys[1024];
+GLuint itemsTexIDs[3];
 
-
-enum sprites_states { IDLE=1, MOVING_LEFT, MOVING_RIGHT };
-
+enum sprites_states
+{
+	IDLE = 1,
+	MOVING_LEFT,
+	MOVING_RIGHT
+};
 
 // Código fonte do Vertex Shader (em GLSL): ainda hardcoded
 const GLchar *vertexShaderSource = R"(
@@ -106,6 +109,9 @@ void main()
 // Função MAIN
 int main()
 {
+
+	srand(time(0)); // Pega o horário do sistema como semente para a geração de nros aleatórios
+
 	// Inicialização da GLFW
 	glfwInit();
 
@@ -156,33 +162,35 @@ int main()
 	// Compilando e buildando o programa de shader
 	GLuint shaderID = setupShader();
 
-	//Criação dos sprites - objetos da cena
-	Sprite background, character, item;
+	// Criação dos sprites - objetos da cena
+	Sprite background, character;
+	vector<Sprite> items;
 	int imgWidth, imgHeight, texID;
 
 	// Carregando uma textura do personagem e armazenando seu id
-	texID = loadTexture("../Textures/Characters/Female 23-1.png",imgWidth,imgHeight);
-	character = initializeSprite(texID, vec3(imgWidth*3,imgHeight*3,1.0),vec3(400,100,0),4,3);
+	texID = loadTexture("../Textures/Characters/Female 23-1.png", imgWidth, imgHeight);
+	character = initializeSprite(texID, vec3(imgWidth * 3, imgHeight * 3, 1.0), vec3(400, 100, 0), 4, 3);
 
-	texID = loadTexture("../Textures/Backgrounds/Preview 3.png",imgWidth,imgHeight);
-	background = initializeSprite(texID, vec3(imgWidth*0.4,imgHeight*0.4,1.0),vec3(400,300,0));
+	texID = loadTexture("../Textures/Backgrounds/Preview 3.png", imgWidth, imgHeight);
+	background = initializeSprite(texID, vec3(imgWidth * 0.4, imgHeight * 0.4, 1.0), vec3(400, 300, 0));
 
-	glm::vec3 posItem;
-	posItem.x = rand() % (790-10+1) + 10;      //valor entre 10 e 790
-	posItem.y = rand() % (850-650+1) + 650;                     //valor entre 650 e 850
-	texID = loadTexture("../Textures/Items/Icon30.png",imgWidth,imgHeight);
-	item = initializeSprite(texID, vec3(imgWidth*1.5,imgHeight*1.5,1.0),vec3(posItem.x,posItem.y,0));
+	itemsTexIDs[0] = loadTexture("../Textures/Items/Icon30.png", imgWidth, imgHeight);
+	itemsTexIDs[1] = loadTexture("../Textures/Items/Icon26.png", imgWidth, imgHeight);
+	itemsTexIDs[2] = loadTexture("../Textures/Items/Icon42.png", imgWidth, imgHeight);
+
+	for (int i = 0; i < 3; i++)
+	{
+		items.push_back(initializeSprite(0, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
+		spawnItem(items[items.size()-1]);
+	}
 
 	glUseProgram(shaderID);
 
-	
-
-	//Ativando o primeiro buffer de textura da OpenGL
+	// Ativando o primeiro buffer de textura da OpenGL
 	glActiveTexture(GL_TEXTURE0);
 
 	// Enviar a informação de qual variável armazenará o buffer da textura
 	glUniform1i(glGetUniformLocation(shaderID, "texBuff"), 0);
-	
 
 	// Matriz de projeção paralela ortográfica
 	// mat4 projection = ortho(-10.0, 10.0, -10.0, 10.0, -1.0, 1.0);
@@ -193,15 +201,15 @@ int main()
 	mat4 model = mat4(1); // matriz identidade
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
 
-	//Habilitando o teste de profundidade
+	// Habilitando o teste de profundidade
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_ALWAYS);
 
-	//Habilitando a transparência
+	// Habilitando a transparência
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	character.iAnimation = IDLE; //Explicar isso semana que vem
+	character.iAnimation = IDLE; // Explicar isso semana que vem
 
 	// Loop da aplicação - "game loop"
 	while (!glfwWindowShouldClose(window))
@@ -210,23 +218,25 @@ int main()
 		glfwPollEvents();
 
 		// Limpa o buffer de cor
-		glClearColor(193/255.0f, 229/255.0f, 245/255.0f, 1.0f); // cor de fundo
+		glClearColor(193 / 255.0f, 229 / 255.0f, 245 / 255.0f, 1.0f); // cor de fundo
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), 0.0, 0.0); // enviando para variável uniform offsetTex
-		// Primeiro Sprite 
+		// Primeiro Sprite
 		drawSprite(shaderID, background);
-		
-		//Depois, o personagem e outros itens
+
+		// Depois, o personagem e outros itens
 		moveSprite(shaderID, character);
-		updateSprite(shaderID,character);
+		updateSprite(shaderID, character);
 		drawSprite(shaderID, character);
 
 		// Itens
 		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), 0.0, 0.0);
-		drawSprite(shaderID, item);
-		updateItems(shaderID, item);
-
+		for (int i = 0; i < items.size(); i++)
+		{
+			drawSprite(shaderID, items[i]);
+			updateItems(shaderID, items[i]);
+		}
 
 		glBindVertexArray(0); // Desconectando o buffer de geometria
 
@@ -234,7 +244,7 @@ int main()
 		glfwSwapBuffers(window);
 	}
 	// Pede pra OpenGL desalocar os buffers
-	//glDeleteVertexArrays(1, character.VAO);
+	// glDeleteVertexArrays(1, character.VAO);
 	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
 	glfwTerminate();
 	return 0;
@@ -247,7 +257,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, GL_TRUE);
-	
+
 	if (action == GLFW_PRESS)
 	{
 		keys[key] = true;
@@ -255,9 +265,7 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 	else if (action == GLFW_RELEASE)
 	{
 		keys[key] = false;
-
 	}
-		
 }
 
 // Esta função está basntante hardcoded - objetivo é compilar e "buildar" um programa de
@@ -324,11 +332,11 @@ int setupGeometry()
 	// Cada atributo do vértice (coordenada, cores, coordenadas de textura, normal, etc)
 	// Pode ser arazenado em um VBO único ou em VBOs separados
 	GLfloat vertices[] = {
-		// x    y    z   s    t 
+		// x    y    z   s    t
 		// T0
-		-0.5, -0.5, 0.0, 0.0, 0.0,    // v0
-		 0.5, -0.5, 0.0, 1.0, 0.0,    // v1
-		 0.0,  0.5, 0.0, 0.5, 1.0  	  // v2
+		-0.5, -0.5, 0.0, 0.0, 0.0, // v0
+		0.5, -0.5, 0.0, 1.0, 0.0,  // v1
+		0.0, 0.5, 0.0, 0.5, 1.0	   // v2
 	};
 
 	GLuint VBO, VAO;
@@ -352,12 +360,12 @@ int setupGeometry()
 	//  Tamanho em bytes
 	//  Deslocamento a partir do byte zero
 
-	//Atributo posição - coord x, y, z - 3 valores
+	// Atributo posição - coord x, y, z - 3 valores
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
 	glEnableVertexAttribArray(0);
 
-	//Atributo coordenada de textura - coord s, t - 2 valores
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3* sizeof(GLfloat)));
+	// Atributo coordenada de textura - coord s, t - 2 valores
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(1);
 
 	// Observe que isso é permitido, a chamada para glVertexAttribPointer registrou o VBO como o objeto de buffer de vértice
@@ -385,19 +393,19 @@ Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnima
 	sprite.iAnimation = 0;
 	sprite.vel = vel;
 
-	sprite.ds = 1.0 / (float) nFrames;
-	sprite.dt = 1.0 / (float) nAnimations;
+	sprite.ds = 1.0 / (float)nFrames;
+	sprite.dt = 1.0 / (float)nAnimations;
 
 	GLfloat vertices[] = {
-		// x    y    z   s    t 
+		// x    y    z   s    t
 		// T0
-		-0.5,  0.5, 0.0, 0.0, sprite.dt,        // v0
-		-0.5, -0.5, 0.0, 0.0, 0.0,              // v1
-		 0.5,  0.5, 0.0, sprite.ds, sprite.dt, 	// v2
+		-0.5, 0.5, 0.0, 0.0, sprite.dt,		 // v0
+		-0.5, -0.5, 0.0, 0.0, 0.0,			 // v1
+		0.5, 0.5, 0.0, sprite.ds, sprite.dt, // v2
 		// T1
-		-0.5, -0.5, 0.0, 0.0, 0.0,              // v1
-		 0.5,  0.5, 0.0, sprite.ds, sprite.dt, 	// v2
-		 0.5, -0.5, 0.0, sprite.ds, 0.0  	    // v3
+		-0.5, -0.5, 0.0, 0.0, 0.0,			 // v1
+		0.5, 0.5, 0.0, sprite.ds, sprite.dt, // v2
+		0.5, -0.5, 0.0, sprite.ds, 0.0		 // v3
 	};
 
 	GLuint VBO, VAO;
@@ -414,13 +422,13 @@ Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnima
 	// e os ponteiros para os atributos
 	glBindVertexArray(VAO);
 	// Para cada atributo do vertice, criamos um "AttribPointer" (ponteiro para o atributo)
-	
-	//Atributo posição - coord x, y, z - 3 valores
+
+	// Atributo posição - coord x, y, z - 3 valores
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
 	glEnableVertexAttribArray(0);
 
-	//Atributo coordenada de textura - coord s, t - 2 valores
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3* sizeof(GLfloat)));
+	// Atributo coordenada de textura - coord s, t - 2 valores
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(1);
 
 	// Observe que isso é permitido, a chamada para glVertexAttribPointer registrou o VBO como o objeto de buffer de vértice
@@ -432,30 +440,29 @@ Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnima
 
 	sprite.VAO = VAO;
 
-    return sprite;
+	return sprite;
 }
 
 void drawSprite(GLuint shaderID, Sprite &sprite)
 {
-	glBindVertexArray(sprite.VAO); // Conectando ao buffer de geometria
-	glBindTexture(GL_TEXTURE_2D, sprite.texID); //conectando com o buffer de textura que será usado no draw
+	glBindVertexArray(sprite.VAO);				// Conectando ao buffer de geometria
+	glBindTexture(GL_TEXTURE_2D, sprite.texID); // conectando com o buffer de textura que será usado no draw
 
 	// Matriz de modelo: transformações na geometria (objeto)
 	mat4 model = mat4(1); // matriz identidade
 	// Translação
 	model = translate(model, sprite.pos);
 	// Rotação
-	model = rotate(model, radians(sprite.angle), vec3(0.0,0.0,1.0));
+	model = rotate(model, radians(sprite.angle), vec3(0.0, 0.0, 1.0));
 	// Escala
 	model = scale(model, sprite.dimensions);
-	
+
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
-	glBindVertexArray(0); // Desconectando ao buffer de geometria
-	glBindTexture(GL_TEXTURE_2D, 0); // Desconectando com o buffer de textura 
-
+	glBindVertexArray(0);			 // Desconectando ao buffer de geometria
+	glBindTexture(GL_TEXTURE_2D, 0); // Desconectando com o buffer de textura
 }
 
 void updateSprite(GLuint shaderID, Sprite &sprite)
@@ -466,10 +473,10 @@ void updateSprite(GLuint shaderID, Sprite &sprite)
 	float dt = now - lastTime;
 	if (dt >= 1 / FPS)
 	{
-		sprite.iFrame = (sprite.iFrame + 1) % sprite.nFrames; //incrementando ciclicamente o indice do Frame
+		sprite.iFrame = (sprite.iFrame + 1) % sprite.nFrames; // incrementando ciclicamente o indice do Frame
 		lastTime = now;
 	}
-	
+
 	vec2 offsetTex;
 	offsetTex.s = sprite.iFrame * sprite.ds;
 	offsetTex.t = sprite.iAnimation * sprite.dt;
@@ -556,8 +563,13 @@ void moveSprite(GLuint shaderID, Sprite &sprite)
 	{
 		sprite.iAnimation = IDLE;
 	}
+}
 
-
+void spawnItem(Sprite &sprite)
+{
+	sprite.pos.x = rand() % (790 - 10 + 1) + 10;	// valor entre 10 e 790
+	sprite.pos.y = rand() % (5000 - 650 + 1) + 650; // valor entre 650 e 850
+	sprite.texID = itemsTexIDs[rand() % 3];
 }
 
 void updateItems(GLuint shader, Sprite &sprite)
@@ -566,10 +578,8 @@ void updateItems(GLuint shader, Sprite &sprite)
 	{
 		sprite.pos.y -= sprite.vel;
 	}
-	else 
+	else
 	{
-		sprite.pos.x = rand() % (790-10+1) + 10;      //valor entre 10 e 790
-		sprite.pos.y = rand() % (850-650+1) + 650;    //valor entre 650 e 850
+		spawnItem(sprite);
 	}
-
 }
