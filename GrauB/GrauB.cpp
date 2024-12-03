@@ -64,7 +64,7 @@ void updateSprite (GLuint shaderID, Sprite &sprite);
 void moveSprite (GLuint shaderID, Sprite &sprite);
 
 void updateItems (GLuint shader, Sprite &sprite);
-void spawnItem (Sprite &sprite);
+void spawnItem (Sprite &sprite);	// função que gera (spawn) os itens em posições "x,y" aleatórias
 
 void calculateAABB (Sprite &sprite);
 bool checkCollision (Sprite one, Sprite two);
@@ -74,7 +74,7 @@ Sprite initializeSprite ( GLuint textureID,
 						  vec3 position,
 						  int nAnimations = 1,
 						  int nFrames = 1,
-						  float vel = 0.1,
+						  float vel = 0.1f,	// original = 1.5f
 						  float angle = 0.0 );
 
 
@@ -83,13 +83,18 @@ const GLuint WIDTH = 800, HEIGHT = 600;	// Dimensões da janela
 
 
 /*** Variáveis Globais	***/
-float FPS = 12.0f;
-float lastTime = 0;
 bool keys[1024];	// para identificar as teclas pressionadas
-int itemsTextureID[3];
+
+float FPS = 12.0f;
+float velItems 	  = 0.1f;	// original = 1.5f
+float velMaxItens = 1.0f;
+float velSprites  = 0.1f;	// original = 1.5f
+float lastSpawnX = 400.0;	// posição "x" inicial de criação dos itens, acima da tela
+
+float lastTime = 0;
+
+int itemsTextureID[4];	// para guardar o ID das texturas de cada iten
 int lives = 5;
-float velItems = 0.01f;
-float lastSpawnX = 400.0;
 
 
 /*** Códigos fonte do Vertex Shader e do Fragment Shader -> deslocados para a função SetupShader() ***/
@@ -132,36 +137,40 @@ int main() {
 
 	// Criação dos sprites - objetos da cena
 	Sprite background, character;
-	vector<Sprite> items;
+	vector <Sprite> items;	// armazenamento dos itens
 
 	// Variáveis locais
 	int score = 0;
 	bool gameover = false;
 	int imgWidth, imgHeight, textureID;
 
-	// Carregando a textura do personagem e armazenando seu id em character
-	textureID = loadTexture("../Textures/Characters/Female 23-1.png", imgWidth, imgHeight);
-	character = initializeSprite(textureID, vec3(imgWidth * 3, imgHeight * 3, 1.0), vec3(400, 100, 0), 4, 3);
-
-	// Carregando a textura do fundo e armazenando seu id em backgroud
-	textureID = loadTexture("../Textures/Backgrounds/Preview 3.png", imgWidth, imgHeight);
+	// Carregando a textura do fundo e armazenando seu id em "backgroud"
+	textureID  = loadTexture("../Textures/Backgrounds/Preview 3.png", imgWidth, imgHeight);
 	background = initializeSprite(textureID, vec3(imgWidth * 0.4, imgHeight * 0.4, 1.0), vec3(400, 300, 0));
 
-	// Carregando as texturas dos itens e armazenando seu id em itemsTextureID[]
-	itemsTextureID[0] = loadTexture("../Textures/Items/Icon30.png", imgWidth, imgHeight);
-	itemsTextureID[1] = loadTexture("../Textures/Items/Icon26.png", imgWidth, imgHeight);
-	itemsTextureID[2] = loadTexture("../Textures/Items/Icon42.png", imgWidth, imgHeight);
+	// Carregando a textura do personagem e armazenando seu id em "character"
+	textureID  = loadTexture("../Textures/Characters/Female 23-1.png", imgWidth, imgHeight);
+	character  = initializeSprite(textureID, vec3(imgWidth * 3.0, imgHeight * 3.0, 1.0), vec3(400, 100, 0), 4, 3);
 
-	for (int i = 0; i < 3; i++) {
-		items.push_back(initializeSprite(0, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
+	// Carregando as texturas dos itens e armazenando seus ids em "itemsTextureID[]"
+	itemsTextureID[0] = loadTexture("../Textures/Items/Icon16.png", imgWidth, imgHeight);
+	itemsTextureID[1] = loadTexture("../Textures/Items/Icon26.png", imgWidth, imgHeight);
+	itemsTextureID[2] = loadTexture("../Textures/Items/Icon30.png", imgWidth, imgHeight);
+	itemsTextureID[3] = loadTexture("../Textures/Items/Icon42.png", imgWidth, imgHeight);
+
+	// inicializa e gera os itens para utilização no gameloop
+	// Notamos que todas as imagens são 32x32 originalmente e usamos imgWidth e imgHeight da última carregada
+	for (int i = 0; i < 4; i++) {
+		items.push_back(initializeSprite(itemsTextureID[i], vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
 		spawnItem(items[items.size()-1]);
+		cout << "item " << i << " criado em posição " << items[i].pos.x << " , " << items[i].pos.y << endl;
 	}
 
 	// Ativando o primeiro buffer de textura da OpenGL
 	glActiveTexture(GL_TEXTURE0);
 
 	// Enviar a informação de qual variável do shader armazenará o buffer da textura
-	glUniform1i(glGetUniformLocation(shaderID, "texBuff"), 0);
+	glUniform1i(glGetUniformLocation(shaderID, "textureBuffer"), 0);
 
 	// Aplica a Matriz de projeção paralela ortográfica (usada para desenhar em 2D)
 	mat4 projection = ortho(0.0, 800.0, 0.0, 600.0, -1.0, 1.0);  	// ortho(Left, Right, Bottom, Top, Near, Far)
@@ -195,7 +204,7 @@ int main() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// enviando para variável uniform offsetTex
-		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), 0.0, 0.0); 
+		glUniform2f(glGetUniformLocation(shaderID, "offsetTexture"), 0.0, 0.0); 
 
 		//Checagem das colisões
 		calculateAABB(character); // Calcula (atualiza) o PMin e o PMax usados para testar a colisão
@@ -203,6 +212,7 @@ int main() {
 			calculateAABB(items[i]);
 			if (checkCollision(character,items[i]))	{
 				spawnItem(items[i]);
+				cout << "item " << i << " recriado em posição " << items[i].pos.x << " , " << items[i].pos.y << endl;
 				score++;
 				cout << "Pontuacao = " << score << endl;
 				velItems += 0.01;	// aumenta a velocidade de queda dos itens
@@ -218,9 +228,9 @@ int main() {
 		drawSprite(shaderID, character);
 
 		// Itens
-		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), 0.0, 0.0);
+		glUniform2f(glGetUniformLocation(shaderID, "offsetTexture"), 0.0, 0.0);
 		for (int i = 0; i < items.size(); i++) {
-			drawSprite(shaderID, items[i]);
+			drawSprite (shaderID, items[i]);
 			updateItems(shaderID, items[i]);
 		}
 
@@ -263,33 +273,32 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 	// Código fonte do Vertex Shader (em GLSL - Graphics Library Shading Language)
 	const GLchar *vertexShaderSource = R"(
 		#version 400
-		layout (location = 0) in vec3 position;
-		layout (location = 1) in vec2 texc;
+		layout (location = 0) in vec3 coordenadasDaGeometria;
+		layout (location = 1) in vec2 coordenadasDaTextura;
 		uniform mat4 projection;
 		uniform mat4 model;
-		out vec2 texCoord;
+		out vec2 textureCoord;
 		void main() {
-   			gl_Position = projection * model * vec4(position.x, position.y, position.z, 1.0);
-			texCoord = vec2(texc.s,1.0-texc.t);
+   			gl_Position = projection * model * vec4( coordenadasDaGeometria , 1.0 );
+			textureCoord = vec2( coordenadasDaTextura.s , 1.0 - coordenadasDaTextura.t );
 		}
 	)";
-			// "position" recebe as informações que estão no local 0 -> definidas em glVertexAttribPointer(0, xxxxxxxx);
-			// "projection" recebe as informações que estão no local 0 ->
-			// "projection" receberá as informações da forma de projeção escolhida
-			// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
-			// "texCoord" 
-			// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
-			// sempre nessa ordem: projection * model * 
-			// é vec4 por causa das multiplicações de matrizes, usadas para translação, rotação e escala.
+		// "coordenadasDaGeometria" recebe as informações que estão no local 0 -> definidas em glVertexAttribPointer(0, xxxxxxxx);
+		// "coordenadasDaTextura"   recebe as informações que estão no local 1 -> definidas em glVertexAttribPointer(1, xxxxxxxx);
+		// "projection" receberá as informações da forma de projeção escolhida
+		// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
+		// "textureCoord" enviará ao pipeline a textura de uma posição específica
+		// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
+		
 
 	//Código fonte do Fragment Shader (em GLSL - Graphics Library Shading Language)
 	const GLchar* fragmentShaderSource = R"(
 		#version 400
-		in vec2 texCoord;				// incluído
-		uniform sampler2D texBuff;		// incluído
-		uniform vec2 offsetTex;			// incluído
+		in vec2 textureCoord;			 // incluído
+		uniform sampler2D textureBuffer; // incluído
+		uniform vec2 offsetTexture;		 // incluído
 		out vec4 color;
-		void main() { color = texture(texBuff,texCoord + offsetTex); }	// modificado
+		void main() { color = texture(textureBuffer,textureCoord + offsetTexture); }	// modificado
 	)";
 
 	// Vertex shader
@@ -345,7 +354,7 @@ Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nA
 	Sprite sprite;
 
 	sprite.textureID = textureID;
-	sprite.dimensions.x = dimensions.x / nFrames;
+	sprite.dimensions.x = dimensions.x / nFrames;		// dimensão em "x" é 
 	sprite.dimensions.y = dimensions.y / nAnimations;
 	sprite.pos = position;
 	sprite.nAnimations = nAnimations;
@@ -355,19 +364,19 @@ Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nA
 	sprite.iAnimation = 0;
 	sprite.vel = vel;
 
-	sprite.ds = 1.0 / (float)nFrames;
-	sprite.dt = 1.0 / (float)nAnimations;
+	sprite.ds = 1.0 / (float)nFrames;		// divide pela quantidade de colunas do spritesheet
+	sprite.dt = 1.0 / (float)nAnimations;	// divide pela quantidade de linhas do spritesheet
 
 	GLfloat vertices[] = {
 		// x    y    z       s          t
 		// T0
-		-0.5,  0.5, 0.0,    0.0,    sprite.dt,	// v0
-		-0.5, -0.5, 0.0,    0.0,       0.0,		// v1
-		 0.5,  0.5, 0.0, sprite.ds, sprite.dt, 	// v2
+		-0.5,  0.5, 0.0,    0.0,    sprite.dt,	// v0	t0
+		-0.5, -0.5, 0.0,    0.0,       0.0,		// v1	t1
+		 0.5,  0.5, 0.0, sprite.ds, sprite.dt, 	// v2	t2
 		// T1
-		-0.5, -0.5, 0.0,    0.0,       0.0,		// v1
-		 0.5,  0.5, 0.0, sprite.ds, sprite.dt, 	// v2
-		 0.5, -0.5, 0.0, sprite.ds,    0.0		// v3
+		-0.5, -0.5, 0.0,    0.0,       0.0,		// v1	t1
+		 0.5,  0.5, 0.0, sprite.ds, sprite.dt, 	// v2	t2
+		 0.5, -0.5, 0.0, sprite.ds,    0.0		// v3	t3
 	};
 
 	GLuint VBO, VAO;
@@ -389,7 +398,7 @@ Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nA
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
 	glEnableVertexAttribArray(0);
 
-	// Atributo coordenada de textura - coord s, t - 2 valores
+	// Atributo textura - coord s, t - 2 valores
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3 * sizeof(GLfloat)));
 	glEnableVertexAttribArray(1);
 
@@ -427,28 +436,27 @@ void drawSprite(GLuint shaderID, Sprite &sprite)
 }
 
 
-//
-void updateSprite(GLuint shaderID, Sprite &sprite)
-{
+// 
+void updateSprite(GLuint shaderID, Sprite &sprite) {
 
 	// Incrementando o índice do frame apenas quando fechar a taxa de FPS desejada
 	float now = glfwGetTime();
 	float dt = now - lastTime;
-	if (dt >= 1 / FPS)
-	{
+	if (dt >= 1 / FPS) {
 		sprite.iFrame = (sprite.iFrame + 1) % sprite.nFrames; // incrementando ciclicamente o indice do Frame
 		lastTime = now;
 	}
 
-	vec2 offsetTex;
-	offsetTex.s = sprite.iFrame * sprite.ds;
-	offsetTex.t = sprite.iAnimation * sprite.dt;
-	glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), offsetTex.s, offsetTex.t); // enviando cor para variável uniform offsetTex
+	vec2 offsetTexture;
+	offsetTexture.s = sprite.iFrame * sprite.ds;
+	offsetTexture.t = sprite.iAnimation * sprite.dt;
+	glUniform2f(glGetUniformLocation(shaderID, "offsetTexture"), offsetTexture.s, offsetTexture.t); // enviando cor para variável uniform "offsetTexture"
 }
 
 
 // Função responsável pelo carregamento da textura
 int loadTexture(string filePath, int &width, int &height) {
+	
 	GLuint textureID; // id da textura a ser carregada
 
 	// Gera o identificador da textura na memória
@@ -482,7 +490,7 @@ int loadTexture(string filePath, int &width, int &height) {
 }
 
 
-// 
+// Função para movimentar as sprites (neste código só o personagem)
 void moveSprite(GLuint shaderID, Sprite &sprite)
 {
 	if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT]) {
@@ -499,7 +507,7 @@ void moveSprite(GLuint shaderID, Sprite &sprite)
 }
 
 
-// Cria um item a ser coletado
+// função que gera (spawn) os itens a serem coletados/evitados em posições "x,y" aleatórias
 void spawnItem(Sprite &sprite) {
 
 	int max = lastSpawnX + 250;
@@ -521,11 +529,12 @@ void spawnItem(Sprite &sprite) {
 //
 void updateItems(GLuint shader, Sprite &sprite) {
 
-	if (sprite.pos.y > 100)	{ sprite.pos.y -= sprite.vel; }
+	if (sprite.pos.y > 50)	{ sprite.pos.y -= sprite.vel; }	// original era sprite.pos.y > 100
 	else {
 		lives--;
-		cout << "Oh no! Vidas: " << lives << endl;
+		cout << "Vidas: " << lives << endl;
 		spawnItem(sprite);
+		cout << "item recriado na posição " << sprite.pos.x << " , " << sprite.pos.y << endl;
 	}
 }
 

@@ -1,60 +1,62 @@
 /* Hello Triangle - código adaptado de https://learnopengl.com/#!Getting-started/Hello-Triangle
- *
  * Adaptado por Rossana Baptista Queiroz
  * para a disciplina de Processamento Gráfico - Unisinos
  * Versão inicial: 7/4/2017
  * Última atualização em 13/08/2024
- *
- */
+  */
 
 #include <iostream>
 #include <string>
-#include <assert.h>
+#include <cmath>
 #include <vector>
+#include <assert.h>
+#include <stb_image.h>
 
-using namespace std;
+#include <glad/glad.h>	// GLAD
 
-// GLAD
-#include <glad/glad.h>
+#include <GLFW/glfw3.h> // GLFW
 
-// GLFW
-#include <GLFW/glfw3.h>
-
-// GLM
-#include <glm/glm.hpp>
+#include <glm/glm.hpp> // GLM
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <stb_image.h>
-
+using namespace std;
 using namespace glm;
 
-#include <cmath>
+
+
+
+enum sprites_states {IDLE = 1,MOVING_LEFT,MOVING_RIGHT};
 
 // Estrutura de dados das Sprites
 struct Sprite
 {
+
 	GLfloat VAO;   // id do buffer de geometria
 	GLfloat texID; // id da textura
-	vec3 pos, dimensions;
+	vec3 pos;
+	vec3 dimensions;
 	float angle;
+	
 	// Para a animação da spritesheet
 	int nAnimations, nFrames;
 	int iAnimation, iFrame;
 	float ds, dt;
+
+
+
 	// Para a movimentação do sprite
 	float vel;
+
 	// Para o cálculo da colisão (AABB - Axis Aligned Bounding Box)
 	vec2 PMax, PMin;
 };
 
-// Protótipo da função de callback de teclado
-void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 
 // Protótipos (ou Cabeçalhos) das funções
-int setupShader();
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode); // Protótipo da função de callback de teclado
 
-Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations = 1, int nFrames = 1, float vel = 1.5, float angle = 0.0);
+int setupShader();
 GLuint loadTexture(string filePath, int &width, int &height);
 
 void drawSprite(GLuint shaderID, Sprite &sprite);
@@ -67,24 +69,29 @@ void spawnItem(Sprite &sprite);
 void calculateAABB(Sprite &sprite);
 bool checkCollision(Sprite one, Sprite two);
 
+Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations = 1, int nFrames = 1, float vel = 0.2, float angle = 0.0);
+
+
+
+
+
+
+
+
 // Dimensões da janela (pode ser alterado em tempo de execução)
 const GLuint WIDTH = 800, HEIGHT = 600;
+
 
 // Variáveis globais
 float FPS = 12.0f;
 float lastTime = 0;
 bool keys[1024];
 GLuint itemsTexIDs[3];
-int lives = 3;
-float velItems = 0.1f;
+int lives = 5;
+float velItems = 0.01f;
 float lastSpawnX = 400.0;
 
-enum sprites_states
-{
-	IDLE = 1,
-	MOVING_LEFT,
-	MOVING_RIGHT
-};
+
 
 // Código fonte do Vertex Shader (em GLSL): ainda hardcoded
 const GLchar *vertexShaderSource = R"(
@@ -186,7 +193,8 @@ int main()
 	itemsTexIDs[1] = loadTexture("../Textures/Items/Icon26.png", imgWidth, imgHeight);
 	itemsTexIDs[2] = loadTexture("../Textures/Items/Icon42.png", imgWidth, imgHeight);
 
-	for (int i = 0; i < 3; i++)	{
+	for (int i = 0; i < 3; i++)
+	{
 		items.push_back(initializeSprite(0, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
 		spawnItem(items[items.size()-1]);
 	}
@@ -235,9 +243,11 @@ int main()
 		
 		//Checagem das colisões
 		calculateAABB(character); // Calcula (atualiza) o PMin e o PMax usados para testar a colisão
-		for (int i=0; i<items.size(); i++) {
+		for (int i=0; i<items.size(); i++)
+		{
 			calculateAABB(items[i]);
-			if (checkCollision(character,items[i])) {
+			if (checkCollision(character,items[i]))
+			{
 				spawnItem(items[i]);
 				score++;
 				cout << "Pontuacao = " << score << endl;
@@ -256,22 +266,23 @@ int main()
 
 		// Itens
 		glUniform2f(glGetUniformLocation(shaderID, "offsetTex"), 0.0, 0.0);
-		for (int i = 0; i < items.size(); i++) {
+		for (int i = 0; i < items.size(); i++)
+		{
 			drawSprite(shaderID, items[i]);
 			updateItems(shaderID, items[i]);
 		}
 
-		if (lives <= 0) {
+		if (lives <= 0)
+		{
 			gameover = true;
 			cout << "GAME OVER!" << endl;
 		}
 
 		glBindVertexArray(0); // Desconectando o buffer de geometria
 
-		
-		glfwSwapBuffers(window); // Troca os buffers da tela
-	} // fim do while
-
+		// Troca os buffers da tela
+		glfwSwapBuffers(window);
+	}
 	// Pede pra OpenGL desalocar os buffers
 	// glDeleteVertexArrays(1, character.VAO);
 	// Finaliza a execução da GLFW, limpando os recursos alocados por ela
@@ -349,6 +360,7 @@ int setupShader()
 
 	return shaderProgram;
 }
+
 
 
 Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations, int nFrames, float vel, float angle)
@@ -500,23 +512,6 @@ GLuint loadTexture(string filePath, int &width, int &height)
 	return texID;
 }
 
-void drawTriangle(GLuint shaderID, GLuint VAO, vec3 position, vec3 dimensions, float angle, vec3 color, vec3 axis)
-{
-	// Matriz de modelo: transformações na geometria (objeto)
-	mat4 model = mat4(1); // matriz identidade
-	// Translação
-	model = translate(model, position);
-	// Rotação
-	model = rotate(model, radians(angle), axis);
-	// Escala
-	model = scale(model, dimensions);
-	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
-
-	glUniform4f(glGetUniformLocation(shaderID, "inputColor"), color.r, color.g, color.b, 1.0f); // enviando cor para variável uniform inputColor
-																								//  Chamada de desenho - drawcall
-																								//  Poligono Preenchido - GL_TRIANGLES
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-}
 
 void moveSprite(GLuint shaderID, Sprite &sprite)
 {
