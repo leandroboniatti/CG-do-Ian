@@ -41,7 +41,6 @@ struct Sprite {
 /*** Protótipos das funções ***/
 void key_callback (GLFWwindow* window, int key, int scancode, int action, int mode); // Função de callback de teclado
 int  setupShader ();		// Função responsável pela compilação e montagem do programa de shader
-int  setupGeometry();	// Função responsável pela criação do VBO e do VAO de uma geometria
 int  setupSprite();
 void drawSprite(GLuint shaderID, Sprite &sprite);
 void updateSprite(GLuint shaderID, Sprite &sprite);
@@ -102,7 +101,7 @@ int main() {
 	glViewport(0, 0, width, height);
 
 	// Compilando e montando o programa de shader
-	GLuint shaderID = setupShader(); // Retorna o identificador OpenGL para o programa de shader
+	GLuint shaderID = setupShader(); // Retorna o identificador OpenGL do programa de shader
 
 	// Informa qual programa de shader usará, no caso -> shaderID
 	glUseProgram(shaderID);
@@ -136,7 +135,7 @@ int main() {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	character.iAnimation = 1; //Explicar isso semana que vem		
+	character.iAnimation = IDLE; // = 1
 	
 
 	/*** Loop da aplicação - "game loop" ***/
@@ -262,73 +261,7 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 }
 
 
-// Função responsável pela criação do VBO e do VAO - por enquanto, somente um de cada
-// O objetivo é criar os buffers que armazenam a geometria de um triângulo: VBO e VAO
-// Por enquanto, enviando apenas atributo de coordenadas dos vértices
-// Por enquanto, o atributo de cor é enviado externamente por uma variável tipo "uniform" chamada "inputColor"
-// Por enquanto, 1 VBO com as coordenadas, VAO com apenas 1 ponteiro para atributo
-// A função retorna o identificador do VAO (em "main" teremos VAOm = setupShader(), que equivale a VAOm = VAO)
-int setupGeometry() {
-
-	// Aqui setamos as coordenadas x, y e z do triângulo e as armazenamos de forma sequencial, já visando mandar para o VBO (Vertex Buffer Objects)
-	// Cada atributo do vértice (coordenada, cores, coordenadas de textura, normal, etc) pode ser arazenado em um VBO único ou em VBOs separados
-	GLfloat vertices[] = {
-		// x    y    z   s    t 
-	//Triângulo com Textura
-		-0.5, -0.5, 0.0, 0.0, 0.0,    // v0
-		 0.5, -0.5, 0.0, 1.0, 0.0,    // v1
-		 0.0,  0.5, 0.0, 0.5, 1.0, 	  // v2
-
-	//Quadrado com Textura
-		-0.5, -0.5, 0.0, // v0 (Vértice 0 do Quadrado)	// deslocamento = 3
-		 0.5, -0.5, 0.0, // v1 (Vértice 1 do Quadrado)
- 		 0.5,  0.5, 0.0, // v2 (Vértice 2 do Quadrado)
-		-0.5,  0.5, 0.0, // v3 (Vértice 3 do Quadrado)
-
-	// T2 ....			  
-	};
-
-	GLuint VBO, VAO;
-	
-	glGenBuffers(1, &VBO);	// Geração do identificador do VBO (Vertex Buffer Objects)
-	
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);	// Faz a conexão/vinculação do buffer como um buffer de array
-
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);	//Envia os dados do array de floats para o buffer da OpenGl
-
-
-	glGenVertexArrays(1, &VAO);	// Geração do identificador do VAO (Vertex Array Object)
-
-	// Vincula (bind) o VAO primeiro, e em seguida conecta e seta o(s) buffer(s) de vértices
-	// e os ponteiros para os atributos 
-	glBindVertexArray(VAO);
-
-	// Para cada atributo do vertice, criamos um "AttribPointer" (ponteiro para o atributo), indicando: 
-	// Localização no shader * (a localização dos atributos devem ser correspondentes no layout especificado no vertexShaderSource)
-	// Numero de valores que o atributo tem (por ex, 3 coordenadas xyz) 
-	// Tipo do dado
-	// Se está normalizado (entre zero e um)
-	// Tamanho em bytes 
-	// Deslocamento a partir do byte zero
-
-	//Atributo posição - coord x, y, z - 3 valores
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
-	glEnableVertexAttribArray(0);
-
-	//Atributo coordenada de textura - coord s, t - 2 valores
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3* sizeof(GLfloat)));
-	glEnableVertexAttribArray(1);
-
-	// Observe que isso é permitido, a chamada para glVertexAttribPointer registrou o VBO como o objeto de buffer de vértice 
-	// atualmente vinculado - para que depois possamos desvincular com segurança
-	glBindBuffer(GL_ARRAY_BUFFER, 0); 
-
-	glBindVertexArray(0); // Desvincula o VAO (é uma boa prática desvincular qualquer buffer ou array para evitar bugs medonhos)
-
-	return VAO;	// VAO (Vertex Array Object)	// i (interno à função - só para diferenciar do VAOe que está no main)
-}
-
-
+//
 void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float anguloDeRotacao, vec3 escala, vec3 color, vec3 eixoDeRotacao) {
 	
 	/*** Transformações na geometria (objeto) -> sempre na ordem Translação - Rotação - Escala ***/
@@ -354,6 +287,7 @@ void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float
 }
 
 
+//
 Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations, int nFrames, float angle)
 {
 	Sprite sprite;
@@ -419,6 +353,7 @@ Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnima
 }
 
 
+//
 void drawSprite(GLuint shaderID, Sprite &sprite)
 {
 	glBindVertexArray(sprite.VAO); // Conectando ao buffer de geometria
@@ -442,6 +377,8 @@ void drawSprite(GLuint shaderID, Sprite &sprite)
 
 }
 
+
+//
 void updateSprite(GLuint shaderID, Sprite &sprite)
 {
 
@@ -462,8 +399,7 @@ void updateSprite(GLuint shaderID, Sprite &sprite)
 
 
 // Função responsável pelo carregamento da textura
-GLuint loadTexture(string filePath, int &width, int &height)
-{
+GLuint loadTexture(string filePath, int &width, int &height) {
 	GLuint texID; // id da textura a ser carregada
 
 	// Gera o identificador da textura na memória

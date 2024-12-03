@@ -28,7 +28,7 @@ using namespace glm;	// Para não precisar digitar glm:: na frente de comandos d
 // Estrutura para armazenar informações sobre um determinado elemento
 struct Sprite {
 	GLfloat VAO; 	//id do buffer de geometria
-	GLfloat texID; 	//id da textura
+	GLfloat textureID; 	//id da textura
 	vec3 pos, dimensions;
 	float angle;
 	//Para a animação da spritesheet
@@ -40,12 +40,15 @@ struct Sprite {
 
 /*** Protótipos das funções ***/
 void key_callback (GLFWwindow* window, int key, int scancode, int action, int mode); // Função de callback de teclado
+
 int  setupShader ();		// Função responsável pela compilação e montagem do programa de shader
-int  setupGeometry();	// Função responsável pela criação do VBO e do VAO de uma geometria
-int  setupSprite();
+
 void drawSprite(GLuint shaderID, Sprite &sprite);
+
 void updateSprite(GLuint shaderID, Sprite &sprite);
-Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations=1, int nFrames=1, float angle=0.0);
+
+Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nAnimations=1, int nFrames=1, float angle=0.0);
+
 GLuint loadTexture(string filePath, int &width, int &height);	// Protótipo da função responsável pelo carregamento da textura
 
 // Função responsável pela aplicação das transformações de Translação, Rotação e Escala
@@ -56,12 +59,6 @@ void aplicaTransformacoes (	GLuint shaderID,			// 1º parâmetro: identificador 
 							vec3 escala,				// 5º parâmetro: dimensão final do elemento
 							vec3 color,					// 6º parâmetro: cor do elemento
 							vec3 eixoDeRotacao = (vec3(0.0, 0.0, 1.0)) ); // 7º parâmetro: eixo no qual se processará a rotação estipulada no 4º parâmetro. Defauld -> eixo "z"
-
-// Sobrecarga da função responsável pela aplicação das transformações de Translação, Rotação e Escala
-void aplicaTransformacoes (	GLuint shaderID, Sprite elemento, vec3 eixoDeRotacao = vec3(0.0, 0.0, 1.0) );
-														// 1º parâmetro: identificador do programa de shader
-														// 2º parâmetro: elemento (Sprite) que será processado
-														// 3º parâmetro: eixo no qual se processará a rotação do elemento. Defauld -> eixo "z"
 
 
 
@@ -109,14 +106,14 @@ int main() {
 
 	//Criação dos sprites - objetos da cena
 	Sprite background, character;
-	int imgWidth, imgHeight, texID;
+	int imgWidth, imgHeight, textureID;
 
 	// Carregando uma textura do personagem e armazenando seu id
-	texID = loadTexture("../Textures/Characters/Female 23-1.png",imgWidth,imgHeight);
-	character = initializeSprite(texID, vec3(imgWidth*3,imgHeight*3,1.0),vec3(400,100,0),4,3);
+	textureID = loadTexture("../Textures/Characters/Female 23-1.png",imgWidth,imgHeight);
+	character = initializeSprite(textureID, vec3(imgWidth*3,imgHeight*3,1.0),vec3(400,100,0),4,3);
 
-	texID = loadTexture("../Textures/Backgrounds/orig.png",imgWidth,imgHeight);
-	background = initializeSprite(texID, vec3(imgWidth*1.4,imgHeight*1.6,1.0),vec3(400,300,0));
+	textureID = loadTexture("../Textures/Backgrounds/orig.png",imgWidth,imgHeight);
+	background = initializeSprite(textureID, vec3(imgWidth*1.4,imgHeight*1.6,1.0),vec3(400,300,0));
 
 	// Ativando o primeiro buffer (0) de textura da OpenGL
 	glActiveTexture(GL_TEXTURE0);
@@ -189,18 +186,20 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 	const GLchar* vertexShaderSource = R"(
 		#version 400							
 		layout (location = 0) in vec3 position;
-		layout (location = 1) in vec2 texc;		// incluído
-		uniform mat4 projection;				// "projection" receberá as informações da forma de projeção escolhida
-		uniform mat4 model;						// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
-		out vec2 texCoord;						// incluído
+		layout (location = 1) in vec2 texc;		
+		uniform mat4 projection;				
+		uniform mat4 model;						
+		out vec2 texCoord;						
 		void main() {
 			gl_Position = projection * model * vec4(position, 1.0);
 			texCoord = vec2(texc.s,1.0-texc.t);	// incluído
 		}
 	)";
 			// "position" recebe as informações que estão no local 0 -> definidas em glVertexAttribPointer(0, xxxxxxxx);
+			// "projection" recebe as informações que estão no local 0 ->
 			// "projection" receberá as informações da forma de projeção escolhida
-			// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)			
+			// "model" receberá as informações das transformações a serem aplicadas (translação, escala, rotação)
+
 			// "gl_Position" é uma variável específica do GLSL que recebe a posição final do vertice processado
 			// sempre nessa ordem: projection * model * 
 			// é vec4 por causa das multiplicações de matrizes, usadas para translação, rotação e escala.
@@ -262,103 +261,16 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 }
 
 
-// Função responsável pela criação do VBO e do VAO - por enquanto, somente um de cada
-// O objetivo é criar os buffers que armazenam a geometria de um triângulo: VBO e VAO
-// Por enquanto, enviando apenas atributo de coordenadas dos vértices
-// Por enquanto, o atributo de cor é enviado externamente por uma variável tipo "uniform" chamada "inputColor"
-// Por enquanto, 1 VBO com as coordenadas, VAO com apenas 1 ponteiro para atributo
-// A função retorna o identificador do VAO (em "main" teremos VAOm = setupShader(), que equivale a VAOm = VAO)
-int setupGeometry() {
-
-	// Aqui setamos as coordenadas x, y e z do triângulo e as armazenamos de forma sequencial, já visando mandar para o VBO (Vertex Buffer Objects)
-	// Cada atributo do vértice (coordenada, cores, coordenadas de textura, normal, etc) pode ser arazenado em um VBO único ou em VBOs separados
-	GLfloat vertices[] = {
-		// x    y    z   s    t 
-	//Triângulo com Textura
-		-0.5, -0.5, 0.0, 0.0, 0.0,    // v0
-		 0.5, -0.5, 0.0, 1.0, 0.0,    // v1
-		 0.0,  0.5, 0.0, 0.5, 1.0, 	  // v2
-
-	//Quadrado com Textura
-		-0.5, -0.5, 0.0, // v0 (Vértice 0 do Quadrado)	// deslocamento = 3
-		 0.5, -0.5, 0.0, // v1 (Vértice 1 do Quadrado)
- 		 0.5,  0.5, 0.0, // v2 (Vértice 2 do Quadrado)
-		-0.5,  0.5, 0.0, // v3 (Vértice 3 do Quadrado)
-
-	// T2 ....			  
-	};
-
-	GLuint VBO, VAO;
-	
-	glGenBuffers(1, &VBO);	// Geração do identificador do VBO (Vertex Buffer Objects)
-	
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);	// Faz a conexão/vinculação do buffer como um buffer de array
-
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);	//Envia os dados do array de floats para o buffer da OpenGl
-
-
-	glGenVertexArrays(1, &VAO);	// Geração do identificador do VAO (Vertex Array Object)
-
-	// Vincula (bind) o VAO primeiro, e em seguida conecta e seta o(s) buffer(s) de vértices
-	// e os ponteiros para os atributos 
-	glBindVertexArray(VAO);
-
-	// Para cada atributo do vertice, criamos um "AttribPointer" (ponteiro para o atributo), indicando: 
-	// Localização no shader * (a localização dos atributos devem ser correspondentes no layout especificado no vertexShaderSource)
-	// Numero de valores que o atributo tem (por ex, 3 coordenadas xyz) 
-	// Tipo do dado
-	// Se está normalizado (entre zero e um)
-	// Tamanho em bytes 
-	// Deslocamento a partir do byte zero
-
-	//Atributo posição - coord x, y, z - 3 valores
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)0);
-	glEnableVertexAttribArray(0);
-
-	//Atributo coordenada de textura - coord s, t - 2 valores
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *)(3* sizeof(GLfloat)));
-	glEnableVertexAttribArray(1);
-
-	// Observe que isso é permitido, a chamada para glVertexAttribPointer registrou o VBO como o objeto de buffer de vértice 
-	// atualmente vinculado - para que depois possamos desvincular com segurança
-	glBindBuffer(GL_ARRAY_BUFFER, 0); 
-
-	glBindVertexArray(0); // Desvincula o VAO (é uma boa prática desvincular qualquer buffer ou array para evitar bugs medonhos)
-
-	return VAO;	// VAO (Vertex Array Object)	// i (interno à função - só para diferenciar do VAOe que está no main)
-}
-
-
-void aplicaTransformacoes(GLuint shaderID, GLuint VAO, vec3 posicaoNaTela, float anguloDeRotacao, vec3 escala, vec3 color, vec3 eixoDeRotacao) {
-	
-	/*** Transformações na geometria (objeto) -> sempre na ordem Translação - Rotação - Escala ***/
-
-	//Matriz de modelo inicial
-	mat4 model = mat4(1); //salva em model a matriz identidade 4x4
-
-	//Translação
-	model = translate(model,posicaoNaTela);
-
-	//Rotação 
-	model = rotate(model,radians(anguloDeRotacao),eixoDeRotacao);
-
-	//Escala
-	model = scale(model,escala);
-	
-	// Transformações sendo enviadas para "model"
-	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
-
-	// Cores sendo enviadas para "inputColor"
-	glUniform4f(glGetUniformLocation(shaderID, "inputColor"), color.r, color.g, color.b , 1.0f);
-	
-}
-
-
-Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnimations, int nFrames, float angle)
+// Função responsável pela criação do VBO e do VAO de cada sprite e
+// inicialização dos demais atributos do sprite
+// Os buffers armazenam a geometria e a textura de dois triângulos
+// Enviando atributo de coordenadas dos vértices em x,y,z
+// Enviando atributo de textura em s,t
+Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nAnimations, int nFrames, float angle)
 {
 	Sprite sprite;
 
-	sprite.texID = texID;
+	sprite.textureID = textureID;
 	sprite.dimensions.x = dimensions.x / nFrames;
 	sprite.dimensions.y = dimensions.y / nAnimations;
 	sprite.pos = position;
@@ -422,25 +334,26 @@ Sprite initializeSprite(GLuint texID, vec3 dimensions, vec3 position, int nAnima
 void drawSprite(GLuint shaderID, Sprite &sprite)
 {
 	glBindVertexArray(sprite.VAO); // Conectando ao buffer de geometria
-	glBindTexture(GL_TEXTURE_2D, sprite.texID); //conectando com o buffer de textura que será usado no draw
+	glBindTexture(GL_TEXTURE_2D, sprite.textureID); //conectando com o buffer de textura que será usado no draw
 
-	// Matriz de modelo: transformações na geometria (objeto)
-	mat4 model = mat4(1); // matriz identidade
-	// Translação
-	model = translate(model, sprite.pos);
-	// Rotação
-	model = rotate(model, radians(sprite.angle), vec3(0.0,0.0,1.0));
-	// Escala
-	model = scale(model, sprite.dimensions);
+	/*** Transformações na geometria (objeto) -> sempre na ordem Translação - Rotação - Escala ***/
+	mat4 model = mat4(1); //Matriz de modelo inicial (salva em model a matriz identidade 4x4)
+
+	model = translate(model, sprite.pos); // Translação
 	
+	model = rotate(model, radians(sprite.angle), vec3(0.0,0.0,1.0)); // Rotação 
+	
+	model = scale(model, sprite.dimensions); // Escala
+	
+	// Transformações sendo enviadas para "model"
 	glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, value_ptr(model));
 
-	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDrawArrays(GL_TRIANGLES, 0, 6); // Desenha dois Triângulos
 
 	glBindVertexArray(0); // Desconectando ao buffer de geometria
 	glBindTexture(GL_TEXTURE_2D, 0); // Desconectando com o buffer de textura 
-
 }
+
 
 void updateSprite(GLuint shaderID, Sprite &sprite)
 {
@@ -464,11 +377,11 @@ void updateSprite(GLuint shaderID, Sprite &sprite)
 // Função responsável pelo carregamento da textura
 GLuint loadTexture(string filePath, int &width, int &height)
 {
-	GLuint texID; // id da textura a ser carregada
+	GLuint textureID; // id da textura a ser carregada
 
 	// Gera o identificador da textura na memória
-	glGenTextures(1, &texID);
-	glBindTexture(GL_TEXTURE_2D, texID);
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_2D, textureID);
 
 	// Ajuste dos parâmetros de wrapping e filtering
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -493,5 +406,5 @@ GLuint loadTexture(string filePath, int &width, int &height)
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	return texID;
+	return textureID;
 }

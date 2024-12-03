@@ -265,8 +265,7 @@ void key_callback (GLFWwindow* window, int key, int scancode, int action, int mo
 
 
 // Função responsável pela compilação e montagem do programa de shader
-// Por enquanto, neste código, um único e simples programa de shader
-// Os códigos fonte do vertex shader e do fragment shader estão nos arrays vertexShaderSource e fragmentShaderSource no iniçio deste arquivo
+// Os códigos fonte do vertex shader e do fragment shader estão nos arrays vertexShaderSource e fragmentShaderSource no iniçio desta função
 // A função retorna o identificador do programa de shader (em "main" teremos shaderID = setupShader(), que equivale a shaderID = shaderProgram)
 int setupShader () {	/*** Função para gerar o programa de shader ***/
 
