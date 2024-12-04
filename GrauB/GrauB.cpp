@@ -11,15 +11,11 @@
 #include <vector>
 #include <assert.h>
 #include <stb_image.h>
-
 #include <glad/glad.h> 	// biblioteca de funções baseada nas definições/especificações OPENGL - Incluir antes de outros que requerem OpenGL (como GLFW)
-
 #include <GLFW/glfw3.h> // biblioteca de funções para criação da janela no Windows e gerenciar entrada de teclado/mouse
-
 #include <glm/glm.hpp>	// biblioteca de operações matriciais
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
 using namespace std;	// Para não precisar digitar std:: na frente de comandos da biblioteca
 using namespace glm;	// Para não precisar digitar glm:: na frente de comandos da biblioteca
 
@@ -36,6 +32,7 @@ const int spriteSheetColuns = 6, spriteSheetLines = 3;	// quantidade de linhas e
 /*** ENUMs e STRUCTs ***/
 // ENUM para definir sentido dado pela entrada de teclado
 enum sprites_states {IDLE = 1,MOVING_RIGHT,MOVING_LEFT}; // Inicializando IDLE em 1 os seguintes serão 2 e 3
+enum sprites_effect	{NONE,COLLECT,DENY};
 
 // Estrutura para armazenar informações sobre um determinado elemento Sprite
 struct Sprite {	
@@ -57,8 +54,9 @@ struct Sprite {
 	// movimentação do sprite
 	float vel;		 	//
 
-	// Para o cálculo da colisão (AABB - Axis Aligned Bounding Box)
-	vec2 PMax, PMin; 	//
+	// Para o cálculo da colisão (AABB - Axis Aligned Bounding Box) e efeito
+	vec2 PMax, PMin;
+	int effect;	// criado para informar se o sprite tipo item criará dano ou coleta ao colidir com o personagem
 };
 
 
@@ -81,9 +79,10 @@ bool checkCollision (Sprite one, Sprite two);
 Sprite initializeSprite ( GLuint textureID,
 						  vec3 dimensions,
 						  vec3 position,
+						  int effect = NONE,	// criado para informar se o sprite tipo item criará dano ou coleta ao colidir
 						  int nAnimations = 1,
 						  int nFrames = 1,
-						  float vel = 1.5f,	// original = 1.5f
+						  float vel = 1.5f,		// original = 1.5f
 						  float angle = 0.0 );
 
 
@@ -155,16 +154,15 @@ int main() {
 
 	// Carregando a textura do personagem e armazenando seu id em "character"
 	textureID  = loadTexture("../Textures/Characters/Personagem.png", imgWidth, imgHeight);
-	character  = initializeSprite(textureID, vec3(imgWidth * 3.0, imgHeight * 3.0, 1.0), vec3(400, 100, 0), spriteSheetLines, spriteSheetColuns, velCharacter);
+	character  = initializeSprite(textureID, vec3(imgWidth * 3.0, imgHeight * 3.0, 1.0), vec3(400, 100, 0), NONE, spriteSheetLines, spriteSheetColuns, velCharacter);
 
 	// Carregando a textura dos itens a serem coletados (moedas) e armazenando seu id em "coin"
 	textureID = loadTexture("../Textures/Items/moeda.png", imgWidth, imgHeight);
-	coin = initializeSprite(textureID, vec3(imgWidth * 0.1, imgHeight * 0.1, 1.0), vec3(0, 0, 0));
+	coin = initializeSprite(textureID, vec3(imgWidth * 0.1, imgHeight * 0.1, 1.0), vec3(0, 0, 0), COLLECT);
 
 	// Carregando a textura dos itens que causam dano (bombas) e armazenando seu id em "bomb"
 	textureID = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
-	bomb = initializeSprite(textureID, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0));
-
+	bomb = initializeSprite(textureID, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0), DENY);
 
 	// Carregando as texturas dos itens e armazenando seus ids em "itemsTextureID[]"
 	//itemsTextureID[0] = loadTexture("../Textures/Items/moeda.png", imgWidth, imgHeight);
@@ -172,7 +170,7 @@ int main() {
 	//itemsTextureID[2] = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
 	//itemsTextureID[3] = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
 
-	// inicializa e gera os itens para utilização no gameloop
+	// inicializa e gera os primeiros itens para utilização no gameloop
 	for (int i = 0; i < maxItems; i++) {
 		int n = rand() % 2;
 		if (n == 1)	{ items.push_back (coin); }	// tipo 1 -> adiciona uma moeda
@@ -180,12 +178,7 @@ int main() {
 		spawnItem(items[i]);
 		cout << "item " << i << " tipo " << n << " criado na posição " << items[i].pos.x << " , " << items[i].pos.y << " com velocidade " << items[i].vel << endl;
 	}
-	/*
-		items.push_back(initializeSprite(itemsTextureID[i], vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
-		spawnItem(items[items.size()-1]);
-		cout << "item " << i << " criado em posição " << items[i].pos.x << " , " << items[i].pos.y << endl;
-	}
-*/
+
 	// Ativando o primeiro buffer de textura da OpenGL
 	glActiveTexture(GL_TEXTURE0);
 
@@ -374,7 +367,7 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 
 
 //
-Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nAnimations, int nFrames, float vel, float angle)
+Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int effect, int nAnimations, int nFrames, float vel, float angle)
 {
 	Sprite sprite;
 
@@ -382,6 +375,7 @@ Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nA
 	sprite.dimensions.x = dimensions.x / nFrames;		// dimensão em "x" é 
 	sprite.dimensions.y = dimensions.y / nAnimations;
 	sprite.pos = position;
+	sprite.effect = effect;
 	sprite.nAnimations = nAnimations;
 	sprite.nFrames = nFrames;
 	sprite.angle = angle;
@@ -542,7 +536,7 @@ void spawnItem(Sprite &sprite) {
 	
 	sprite.pos.x = rand() % (max - min + 1) + min;	// valor entre 10 e 790
 	lastSpawnX = sprite.pos.x;
-	sprite.pos.y = rand() % (3000 - 650 + 1) + 650; // valor entre 650 e 3000
+	sprite.pos.y = 500; //rand() % (3000 - 650 + 1) + 650; // valor entre 650 e 3000
 	//sprite.textureID = itemsTextureID[rand() % maxItems];
 	sprite.vel = velItems;
 	int n = rand() % 3;
