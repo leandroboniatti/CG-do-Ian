@@ -83,14 +83,14 @@ Sprite initializeSprite ( GLuint textureID,
 						  vec3 position,
 						  int nAnimations = 1,
 						  int nFrames = 1,
-						  float vel = 1.5f,	// original = 1.5f
+						  float vel = velMin,	// original = 1.5f
 						  float angle = 0.0 );
 
 
 /*** Variáveis Globais	***/
 bool keys[1024];	// para identificar as teclas pressionadas
 
-float velCharacter = velMin;	// original = 1.5f	// era float velSprites = 1.5f;
+float velCharacter = velMin;	// original = 1.5f
 float velItems 	   = velMin;	// original = 1.5f
 
 float lastSpawnX = 400.0;	// posição "x" inicial de criação dos itens, acima da tela
@@ -99,7 +99,7 @@ float lastTime = 0;
 
 int lives = numlives;
 
-int itemsTextureID[4];	// para guardar o ID das texturas de cada iten
+int itemsTextureID[2];	// para guardar o ID das texturas de cada iten
 
 
 /*** Códigos fonte do Vertex Shader e do Fragment Shader -> deslocados para a função SetupShader() ***/
@@ -150,42 +150,34 @@ int main() {
 	int imgWidth, imgHeight, textureID;
 
 	// Carregando a textura do fundo e armazenando seu id em "backgroud"
-	textureID  = loadTexture("../Textures/Backgrounds/fundo.png", imgWidth, imgHeight);
+	textureID = loadTexture("../Textures/Backgrounds/fundo.png", imgWidth, imgHeight);
 	background = initializeSprite(textureID, vec3(imgWidth * 0.4, imgHeight * 0.4, 1.0), vec3(400, 300, 0));
 
 	// Carregando a textura do personagem e armazenando seu id em "character"
-	textureID  = loadTexture("../Textures/Characters/Personagem.png", imgWidth, imgHeight);
-	character  = initializeSprite(textureID, vec3(imgWidth * 3.0, imgHeight * 3.0, 1.0), vec3(400, 100, 0), spriteSheetLines, spriteSheetColuns, velCharacter);
+	textureID = loadTexture("../Textures/Characters/personagem.png", imgWidth, imgHeight);
+	character = initializeSprite(textureID, vec3(imgWidth * 3.0, imgHeight * 3.0, 1.0), vec3(400, 100, 0), spriteSheetLines, spriteSheetColuns);
 
 	// Carregando a textura dos itens a serem coletados (moedas) e armazenando seu id em "coin"
-	textureID = loadTexture("../Textures/Items/moeda.png", imgWidth, imgHeight);
-	coin = initializeSprite(textureID, vec3(imgWidth * 0.1, imgHeight * 0.1, 1.0), vec3(0, 0, 0));
+	textureID = loadTexture("../Textures/itens/moeda.png", imgWidth, imgHeight);
+	coin = initializeSprite(textureID, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0));
+//	items.push_back(coin);
+//	spawnItem(items[0]);
 
 	// Carregando a textura dos itens que causam dano (bombas) e armazenando seu id em "bomb"
-	textureID = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
+	textureID = loadTexture("../Textures/itens/bomba.png", imgWidth, imgHeight);
 	bomb = initializeSprite(textureID, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0));
+//	items.push_back(bomb);
+//	spawnItem(items[1]);
 
-
-	// Carregando as texturas dos itens e armazenando seus ids em "itemsTextureID[]"
-	//itemsTextureID[0] = loadTexture("../Textures/Items/moeda.png", imgWidth, imgHeight);
-	//itemsTextureID[1] = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
-	//itemsTextureID[2] = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
-	//itemsTextureID[3] = loadTexture("../Textures/Items/bomba.png", imgWidth, imgHeight);
-
-	// inicializa e gera os itens para utilização no gameloop
+	// gera os itens para utilização no gameloop, escolhendo aleatóriamente entre moeda ou bomba
 	for (int i = 0; i < maxItems; i++) {
-		int n = rand() % 2;
-		if (n == 1)	{ items.push_back (coin); }	// tipo 1 -> adiciona uma moeda
-		else 		{ items.push_back (bomb); }	// tipo 2 -> adiciona uma bomba
+		int n = rand() % 2 + 1;
+		if (n == 1)	{ items.push_back(bomb); }	// adiciona uma bomba
+		else 		{ items.push_back(coin); }	// adiciona uma moeda
 		spawnItem(items[i]);
 		cout << "item " << i << " tipo " << n << " criado na posição " << items[i].pos.x << " , " << items[i].pos.y << " com velocidade " << items[i].vel << endl;
 	}
-	/*
-		items.push_back(initializeSprite(itemsTextureID[i], vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
-		spawnItem(items[items.size()-1]);
-		cout << "item " << i << " criado em posição " << items[i].pos.x << " , " << items[i].pos.y << endl;
-	}
-*/
+
 	// Ativando o primeiro buffer de textura da OpenGL
 	glActiveTexture(GL_TEXTURE0);
 
@@ -231,16 +223,11 @@ int main() {
 		for (int i=0; i < items.size(); i++) {
 			calculateAABB(items[i]);
 			if (checkCollision(character,items[i]))	{
-				//items[i].textureID = itemsTextureID[rand() % 2];
-				int n = rand() % 2;
-				if (n == 1)	{ items[i] = coin; }	// tipo 1 -> adiciona uma moeda
-				else 		{ items[i] = bomb; }	// tipo 2 -> adiciona uma bomba
-				//velItems += 0.01;	// aumenta a velocidade de queda dos itens
 				spawnItem(items[i]);
-				cout << "item " << i << " tipo " << n << " recriado na posição " << items[i].pos.x << " , " << items[i].pos.y << " com velocidade " << items[i].vel << endl;
+				cout << "item " << i << " recriado em posição " << items[i].pos.x << " , " << items[i].pos.y << endl;
 				score++;
 				cout << "Pontuacao = " << score << endl;
-				
+				velItems += 0.01;	// aumenta a velocidade de queda dos itens
 			}
 		}
 
@@ -373,6 +360,42 @@ int setupShader() {	/*** Função para gerar o programa de shader ***/
 }
 
 
+// Função responsável pelo carregamento da textura
+int loadTexture(string filePath, int &width, int &height) {
+	
+	GLuint textureID; // id da textura a ser carregada
+
+	// Gera o identificador da textura na memória
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_2D, textureID);
+
+	// Ajuste dos parâmetros de wrapping e filtering
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// Carregamento da imagem usando a função stbi_load da biblioteca stb_image
+	int nrChannels;
+
+	unsigned char *data = stbi_load(filePath.c_str(), &width, &height, &nrChannels, 0);
+
+	if (data) {
+		if (nrChannels == 3) { glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data); }	// jpg, bmp -> 3 canais
+		else { glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data); }				// png -> 4 canais
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else { std::cout << "Failed to load texture " << filePath << std::endl; }
+
+	stbi_image_free(data);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return textureID;
+}
+
+
 //
 Sprite initializeSprite(GLuint textureID, vec3 dimensions, vec3 position, int nAnimations, int nFrames, float vel, float angle)
 {
@@ -479,42 +502,6 @@ void updateSprite(GLuint shaderID, Sprite &sprite) {
 }
 
 
-// Função responsável pelo carregamento da textura
-int loadTexture(string filePath, int &width, int &height) {
-	
-	GLuint textureID; // id da textura a ser carregada
-
-	// Gera o identificador da textura na memória
-	glGenTextures(1, &textureID);
-	glBindTexture(GL_TEXTURE_2D, textureID);
-
-	// Ajuste dos parâmetros de wrapping e filtering
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// Carregamento da imagem usando a função stbi_load da biblioteca stb_image
-	int nrChannels;
-
-	unsigned char *data = stbi_load(filePath.c_str(), &width, &height, &nrChannels, 0);
-
-	if (data) {
-		if (nrChannels == 3) { glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data); }	// jpg, bmp -> 3 canais
-		else { glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data); }				// png -> 4 canais
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else { std::cout << "Failed to load texture " << filePath << std::endl; }
-
-	stbi_image_free(data);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	return textureID;
-}
-
-
 // Função para movimentar as sprites (neste código só o personagem)
 void moveSprite(GLuint shaderID, Sprite &sprite)
 {
@@ -543,7 +530,7 @@ void spawnItem(Sprite &sprite) {
 	sprite.pos.x = rand() % (max - min + 1) + min;	// valor entre 10 e 790
 	lastSpawnX = sprite.pos.x;
 	sprite.pos.y = rand() % (3000 - 650 + 1) + 650; // valor entre 650 e 3000
-	//sprite.textureID = itemsTextureID[rand() % maxItems];
+	sprite.textureID = itemsTextureID[rand() % 3];
 	sprite.vel = velItems;
 	int n = rand() % 3;
 	if (n == 1)	{ sprite.vel = sprite.vel + sprite.vel * 0.01; }

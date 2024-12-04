@@ -168,17 +168,17 @@ int main()
 	int imgWidth, imgHeight, texID;
 
 	// Carregando uma textura do personagem e armazenando seu id
-	texID = loadTexture("../Textures/Characters/Female 23-1.png", imgWidth, imgHeight);
+	texID = loadTexture("../Textures/Characters/Personagem.png", imgWidth, imgHeight);
 	character = initializeSprite(texID, vec3(imgWidth * 3, imgHeight * 3, 1.0), vec3(400, 100, 0), 4, 3);
 
-	texID = loadTexture("../Textures/Backgrounds/Preview 3.png", imgWidth, imgHeight);
+	texID = loadTexture("../Textures/Backgrounds/fundo.png", imgWidth, imgHeight);
 	background = initializeSprite(texID, vec3(imgWidth * 0.4, imgHeight * 0.4, 1.0), vec3(400, 300, 0));
 
-	itemsTexIDs[0] = loadTexture("../Textures/Items/Icon30.png", imgWidth, imgHeight);
-	itemsTexIDs[1] = loadTexture("../Textures/Items/Icon26.png", imgWidth, imgHeight);
-	itemsTexIDs[2] = loadTexture("../Textures/Items/Icon42.png", imgWidth, imgHeight);
+	itemsTexIDs[0] = loadTexture("../Textures/Items/moeda.png", imgWidth, imgHeight);
+	itemsTexIDs[1] = loadTexture("../Textures/Items/bomb.png", imgWidth, imgHeight);
+	//itemsTexIDs[2] = loadTexture("../Textures/Items/Icon42.png", imgWidth, imgHeight);
 
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 2; i++)
 	{
 		items.push_back(initializeSprite(0, vec3(imgWidth * 1.5, imgHeight * 1.5, 1.0), vec3(0, 0, 0)));
 		spawnItem(items[items.size()-1]);
